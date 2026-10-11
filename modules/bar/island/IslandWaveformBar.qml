@@ -24,7 +24,7 @@ Item {
     readonly property real displayProgress: isDragging ? dragProgress : root.progress
 
     property real phase: 0.0
-    property real currentAmplitude: (root.isPlaying ? 5.0 : 0.0)
+    property real currentAmplitude: (root.isPlaying ? 4.0 : 0.0)
     Behavior on currentAmplitude {
         NumberAnimation {
             duration: 350
@@ -131,7 +131,7 @@ Item {
                         return;
 
                     const centerY = h / 2;
-                    const strokeW = 3.5;
+                    const strokeW = 4.0;
                     const halfStroke = strokeW / 2;
                     const playedX = Math.max(halfStroke, Math.min(w - halfStroke, w * root.displayProgress));
 
@@ -158,12 +158,12 @@ Item {
                         ctx.lineCap = "round";
                         ctx.lineJoin = "round";
 
-                        const wavelength = 16.0;
+                        const wavelength = 24.0;
                         const k = (2 * Math.PI) / wavelength;
                         const amp = root.currentAmplitude;
                         const taperLen = Math.min(14.0, playedLen * 0.5);
 
-                        for (let x = playedStartX; x < playedX; x += 1.0) {
+                        const waveY = x => {
                             let envelope = 1.0;
                             if (taperLen > 0.001) {
                                 const distStart = x - playedStartX;
@@ -176,14 +176,19 @@ Item {
                                 }
                             }
 
-                            const waveY = centerY + amp * envelope * Math.sin((x - playedStartX) * k - root.phase);
-                            if (x === playedStartX) {
-                                ctx.moveTo(x, waveY);
-                            } else {
-                                ctx.lineTo(x, waveY);
-                            }
+                            return centerY + amp * envelope * Math.sin((x - playedStartX) * k - root.phase);
+                        };
+                        const slope = x => (waveY(x + 0.1) - waveY(x - 0.1)) / 0.2;
+
+                        ctx.moveTo(playedStartX, waveY(playedStartX));
+                        for (let x = playedStartX; x < playedX; x += 2.0) {
+                            const end = Math.min(x + 2.0, playedX);
+                            const third = (end - x) / 3;
+                            ctx.bezierCurveTo(
+                                x + third, waveY(x) + slope(x) * third,
+                                end - third, waveY(end) - slope(end) * third,
+                                end, waveY(end));
                         }
-                        ctx.lineTo(playedX, centerY);
                         ctx.stroke();
                     }
                 }
