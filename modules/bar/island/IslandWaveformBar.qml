@@ -14,9 +14,9 @@ Item {
     implicitWidth: 400
     implicitHeight: 38
 
-    readonly property real position: MprisController.activePlayer?.position ?? 0.0
-    readonly property real length: Math.max(1.0, MprisController.activePlayer?.length ?? 1.0)
-    readonly property real progress: Math.min(1.0, Math.max(0.0, root.position / root.length))
+    readonly property real position: MprisController.position
+    readonly property real length: MprisController.length
+    readonly property real progress: MprisController.progress
     readonly property bool isPlaying: MprisController.isPlaying
 
     property bool isDragging: false
@@ -49,17 +49,8 @@ Item {
         return mins + ":" + (secs < 10 ? "0" : "") + secs;
     }
 
-    Timer {
-        running: MprisController.isPlaying && !root.isDragging
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            MprisController.activePlayer?.positionChanged();
-        }
-    }
-
     function seekTo(fraction: real) {
-        if (!MprisController.activePlayer)
+        if (!MprisController.activePlayer || root.length <= 0)
             return;
         const player = MprisController.activePlayer;
         const targetPos = Math.max(0.0, Math.min(root.length, fraction * root.length));
@@ -97,7 +88,8 @@ Item {
                 id: waveMouseArea
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                enabled: root.length > 0 && (MprisController.activePlayer?.canSeek ?? false)
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                 preventStealing: root.isDragging
 
                 onPressed: mouse => {
@@ -235,7 +227,7 @@ Item {
             Text {
                 renderType: Text.NativeRendering
                 font.hintingPreference: Font.PreferFullHinting
-                text: root.formatTime(root.length)
+                text: root.length > 0 ? root.formatTime(root.length) : "--:--"
                 font.family: Config.theme.monoFont
                 font.pixelSize: Styling.fontSize(-2)
                 color: Colors.overSurfaceVariant

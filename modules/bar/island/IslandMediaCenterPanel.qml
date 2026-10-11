@@ -22,7 +22,7 @@ Item {
     property real maximumHeight: 0
     readonly property real fixedContentHeight: headerRow.implicitHeight
         + heroRow.implicitHeight + waveformRow.Layout.preferredHeight
-        + playbackRow.implicitHeight + mainCol.spacing * 4 + 28
+        + playbackRow.implicitHeight + mainCol.spacing * 3 + 28
 
     readonly property bool hasPlayer: MprisController.activePlayer !== null
     readonly property bool isPlaying: MprisController.isPlaying
@@ -411,9 +411,10 @@ Item {
         }
 
         LyricsView {
+            collapseWhenEmpty: true
             Layout.fillWidth: true
             Layout.preferredHeight: root.maximumHeight > 0
-                ? Math.max(0, Math.min(implicitHeight, root.maximumHeight - root.fixedContentHeight))
+                ? Math.max(0, Math.min(implicitHeight, root.maximumHeight - root.fixedContentHeight - mainCol.spacing))
                 : implicitHeight
             mode: "detail"
             lyricsEnabled: Config.bar.lyricsEnabled

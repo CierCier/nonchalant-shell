@@ -12,6 +12,71 @@ spec.loader.exec_module(lyrics)
 
 
 class LyricsTests(unittest.TestCase):
+    def test_youtube_artist_title_overrides_the_upload_channel(self):
+        self.assertEqual(lyrics.clean(
+            "EllaLangleyVEVO", "Ella Langley - Choosin' Texas (Official Video)",
+            "https://www.youtube.com/watch?v=nUsrYVxrDwI",
+        ), ("Ella Langley", "Choosin' Texas"))
+
+    def test_youtube_label_is_not_treated_as_the_artist(self):
+        self.assertEqual(lyrics.clean(
+            "T-Series", '"Kudi Gujarat Di" Song | Sweetiee Weds NRI | Cast',
+            "https://www.youtube.com/watch?v=example",
+        ), ("", "Kudi Gujarat Di"))
+
+    def test_song_is_preserved_when_it_is_part_of_the_actual_title(self):
+        self.assertEqual(lyrics.clean(
+            "EltonJohnVEVO", "Elton John - Your Song (Official Music Video)",
+            "https://www.youtube.com/watch?v=example",
+        ), ("Elton John", "Your Song"))
+
+    def test_topic_channels_keep_the_performer_without_a_title_prefix(self):
+        self.assertEqual(lyrics.clean(
+            "Ella Langley - Topic", "Choosin' Texas", "https://music.youtube.com/watch?v=example",
+        ), ("Ella Langley", "Choosin' Texas"))
+
+    def test_native_metadata_and_non_youtube_pages_keep_the_artist(self):
+        for url in ("", "https://youtube.com.example.org/watch?v=example"):
+            self.assertEqual(lyrics.clean("Artist", "Home - Live", url), ("Artist", "Home - Live"))
+
+    def test_youtube_prefers_the_video_recording_over_album_timestamps(self):
+        album = {
+            "trackName": "Choosin' Texas", "artistName": "Ella Langley", "duration": 232,
+            "syncedLyrics": "[00:01]Album words",
+        }
+        video = {**album, "duration": 422, "syncedLyrics": "[00:12]Video words"}
+        with patch.object(lyrics, "ask", side_effect=[None, [album, video]]):
+            result = lyrics.lookup("Ella Langley", "Choosin' Texas", "", 421, video=True)
+        self.assertEqual(result["syncedLyrics"], "[00:12]Video words")
+
+    def test_different_video_length_falls_back_to_words_without_wrong_timestamps(self):
+        song = {
+            "trackName": "Kudi Gujarat Di (From Sweetiee Weds Nri)",
+            "artistName": "Jasbir Jassi", "duration": 222,
+            "syncedLyrics": "[00:01]First\n[00:02]Last",
+        }
+        with patch.object(lyrics, "ask", return_value=[song]):
+            result = lyrics.parse(lyrics.lookup("", "Kudi Gujarat Di", "", 140, video=True))
+        self.assertFalse(result["synced"])
+        self.assertEqual([line["text"] for line in result["lines"]], ["First", "Last"])
+
+    def test_unknown_channel_does_not_choose_between_equally_matching_artists(self):
+        first = {
+            "trackName": "Home", "artistName": "First Artist", "duration": 200,
+            "syncedLyrics": "[00:01]First words",
+        }
+        second = {**first, "artistName": "Second Artist"}
+        with patch.object(lyrics, "ask", return_value=[first, second]):
+            self.assertIsNone(lyrics.lookup("", "Home", "", 200, video=True))
+
+    def test_native_lookup_still_rejects_a_different_recording_duration(self):
+        song = {
+            "trackName": "Home", "artistName": "Artist", "duration": 300,
+            "syncedLyrics": "[00:01]Wrong recording",
+        }
+        with patch.object(lyrics, "ask", side_effect=[None, [song], [song]]):
+            self.assertIsNone(lyrics.lookup("Artist", "Home", "", 200))
+
     def test_exact_recording_beats_other_artists_and_live_versions(self):
         original = {
             "trackName": "Home", "artistName": "The Original", "duration": 200,

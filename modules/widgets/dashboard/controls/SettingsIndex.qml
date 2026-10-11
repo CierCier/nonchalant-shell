@@ -63,7 +63,6 @@ QtObject {
             keywords: "bar sidebar lockscreen settings clock 12h 24h time format lyrics LRCLIB track metadata",
             component: "ShellPanel.qml",
             tabs: [
-                { id: "overview", panelSection: "", label: "Overview", keywords: "" },
                 { id: "bar", panelSection: "bar", label: "Bar", keywords: "panel taskbar clock player screen 12h 24h time format lyrics LRCLIB track metadata music song" },
                 { id: "sidebar", panelSection: "sidebar", label: "Sidebar", keywords: "assistant ai enable disable width position pinned" },
                 { id: "lockscreen", panelSection: "lockscreen", label: "Lockscreen", keywords: "lock screen password login position lyrics LRCLIB track metadata music song" },
@@ -80,7 +79,6 @@ QtObject {
             keywords: "appearance look style customize palette scheme",
             component: "ThemePanel.qml",
             tabs: [
-                { id: "overview", panelSection: "", label: "Overview", keywords: "" },
                 { id: "general", panelSection: "general", label: "General", keywords: "wallpaper icons animation font roundness" },
                 { id: "shadow", panelSection: "shadow", label: "Shadows", keywords: "opacity blur offset color" },
                 { id: "colors", panelSection: "colors", label: "Colors", keywords: "scheme palette variant gradient border" }
@@ -96,7 +94,6 @@ QtObject {
             keywords: "hardware info resources cpu ram memory performance",
             component: "SystemPanel.qml",
             tabs: [
-                { id: "overview", panelSection: "", label: "Overview", keywords: "" },
                 { id: "weather", panelSection: "weather", label: "Weather", keywords: "location temperature celsius fahrenheit" },
                 { id: "performance", panelSection: "performance", label: "Performance", keywords: "animations preview effects dashboard" },
                 { id: "system", panelSection: "system", label: "Resources", keywords: "cpu ram memory disk usage monitor" }

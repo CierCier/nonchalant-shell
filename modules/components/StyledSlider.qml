@@ -21,6 +21,7 @@ Item {
 
     signal iconClicked
     signal iconHovered(bool hovered)
+    signal valueEdited(real newValue)
 
     property bool vertical: false
     property string icon: ""
@@ -386,6 +387,7 @@ Item {
             root.dragPosition = pos;
             if (!root.updateOnRelease) {
                 root.value = root.snapMode === "always" ? pos : root.dragPosition;
+                root.valueEdited(root.value);
             }
         }
 
@@ -398,6 +400,7 @@ Item {
                 root.dragPosition = pos;
                 if (!root.updateOnRelease) {
                     root.value = root.snapMode === "always" ? pos : root.dragPosition;
+                    root.valueEdited(root.value);
                 }
             }
         }
@@ -409,6 +412,7 @@ Item {
                     finalValue = root.applyStep(finalValue);
                 }
                 root.value = finalValue;
+                root.valueEdited(finalValue);
                 root.dragPosition = finalValue;
                 root.isDragging = false;
             }
@@ -426,6 +430,7 @@ Item {
                 } else {
                     root.value = root.applyStep(Math.max(0, root.value - scrollStep));
                 }
+                root.valueEdited(root.value);
             } else {
                 wheel.accepted = false;
             }

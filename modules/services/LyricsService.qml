@@ -28,6 +28,8 @@ Singleton {
 
     readonly property bool hasTrack: MprisController.activePlayer !== null
         && MprisController.trackTitle.trim() !== ""
+    readonly property bool youtubeTrack: /^https?:\/\/(?:(?:[a-z0-9-]+\.)*youtube\.com|youtu\.be)(?:[\/?#]|$)/i.test(
+        MprisController.activePlayer?.metadata?.["xesam:url"] ?? "")
     readonly property string track: {
         const player = MprisController.activePlayer;
         if (!player || !MprisController.trackTitle.trim())
@@ -37,7 +39,8 @@ Singleton {
             MprisController.trackArtists || "",
             MprisController.trackTitle,
             player.trackAlbum || "",
-            Math.round(player.length || 0)
+            Math.round(MprisController.length),
+            root.youtubeTrack
         ].join("\n");
     }
     readonly property bool wanted: root.watchers > 0 && root.hasTrack
@@ -157,7 +160,7 @@ Singleton {
         if (!player || !player.canSeek || !Number.isFinite(seconds))
             return false;
 
-        const length = Math.max(0, player.length || 0);
+        const length = MprisController.length;
         const target = Math.max(0, Math.min(length > 0 ? length : seconds, seconds));
         player.position = target;
         root.anchorPosition = target;
@@ -194,7 +197,8 @@ Singleton {
             MprisController.trackArtists || "",
             MprisController.trackTitle,
             player.trackAlbum || "",
-            String(Math.round(player.length || 0))
+            String(Math.round(MprisController.length)),
+            root.youtubeTrack ? "https://youtube.com" : ""
         ];
         query.running = true;
     }

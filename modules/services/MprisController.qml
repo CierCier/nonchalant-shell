@@ -42,7 +42,7 @@ Singleton {
     readonly property string trackTitle: activePlayer ? (activePlayer.trackTitle || "") : ""
     readonly property string trackArtists: activePlayer ? (activePlayer.trackArtists || "") : ""
     readonly property real position: activePlayer ? (activePlayer.position ?? 0.0) : 0.0
-    readonly property real length: activePlayer ? (activePlayer.length ?? 0.0) : 0.0
+    readonly property real length: MediaDuration.length
     readonly property real progress: (length > 0) ? Math.max(0.0, Math.min(1.0, position / length)) : 0.0
 
     Timer {

@@ -25,6 +25,7 @@ ShellRoot {
         implicitWidth: 1000
         implicitHeight: 800
         SettingsTab { id: settings; anchors.fill: parent }
+        ThemePanel { id: compactTheme; width: 1000; visible: false }
         LyricsView { id: lyrics; width: 200; height: 22 }
         TestCase {
             name: "SettingsLyricsRuntime"
@@ -59,8 +60,46 @@ ShellRoot {
                 tryCompare(LyricsService, "watchers", 0, 1000)
                 verify(!LyricsService.queryActive)
                 console.log("SETTINGS_LYRICS_RUNTIME_PASSED")
-                Qt.quit()
             }
+
+            function test_settings_use_available_width() {
+                const loader = findChild(settings, "settingsPanelLoader")
+                verify(loader !== null)
+                const pages = ["network", "bluetooth", "audio", "ai", "shell", "theme", "system"]
+                for (const pageId of pages) {
+                    const page = settings.pageFor(pageId)
+                    verify(!page.tabs.some(tab => tab.id === "overview"))
+                    if (page.tabs.length > 0) {
+                        compare(settings.defaultTab(pageId), page.tabs[0].id)
+                    }
+                    const tabs = page.tabs.length > 0 ? page.tabs.map(tab => tab.id) : [""]
+                    for (const tabId of tabs) {
+                        settings.go(pageId, tabId)
+                        tryCompare(settings, "loadedPageId", pageId, 5000)
+                        for (const availableWidth of [1600, 900, 680]) {
+                            settings.width = availableWidth
+                            tryVerify(() => loader.width > 0 && loader.item.contentWidth === loader.width, 1000)
+                            compare(loader.item.sideMargin, 0)
+                        }
+                    }
+                }
+                settings.go("theme", "colors")
+                tryCompare(settings, "loadedPageId", "theme", 5000)
+                loader.item.openColorPicker(["background", "primary"], "background", "Select Color", () => {})
+                compare(loader.item.colorPickerActive, true)
+                settings.width = 1600
+                tryCompare(loader.item, "contentWidth", loader.width, 1000)
+                compare(loader.item.sideMargin, 0)
+                loader.item.closeColorPicker()
+                compare(loader.item.colorPickerActive, false)
+                compare(settings.currentTabId, "colors")
+                settings.go("theme", "")
+                compare(settings.currentTabId, "colors")
+                compare(compactTheme.contentWidth, 480)
+                console.log("SETTINGS_LAYOUT_RUNTIME_PASSED")
+            }
+
+            function cleanupTestCase() { Qt.quit() }
         }
     }
     Timer {
@@ -105,6 +144,7 @@ class SettingsLyricsRuntimeTests(unittest.TestCase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, output)
             self.assertIn("SETTINGS_LYRICS_RUNTIME_PASSED", output, output)
+            self.assertIn("SETTINGS_LAYOUT_RUNTIME_PASSED", output, output)
             self.assertNotIn("SETTINGS_LYRICS_RUNTIME_TIMEOUT", output, output)
             self.assertNotIn("FAIL!", output, output)
 

@@ -778,7 +778,7 @@ Item {
         // ═══════════════════════════════════════════════════════════════
         IslandMediaCard {
             Layout.fillWidth: true
-            Layout.preferredHeight: 140
+            Layout.preferredHeight: implicitHeight
             lyricsActive: root.lyricsActive
 
             onExpandRequested: root.openMedia()

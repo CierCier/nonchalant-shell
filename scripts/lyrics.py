@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch one track's lyrics from LRCLIB and cache the result locally.
 
-Usage: lyrics.py <artist> <title> <album> <seconds>
+Usage: lyrics.py <artist> <title> <album> <seconds> [source-url]
 
 The JSON response contains timed lines (`t` in seconds), plain lines (`t: -1`),
 an instrumental result, or a missing/network status. Successful answers are
@@ -38,11 +38,25 @@ def cache_dir():
     return path
 
 
-def clean(artist, title):
+def is_youtube(source_url):
+    host = urllib.parse.urlparse(source_url).hostname or ""
+    return host == "youtu.be" or host == "youtube.com" or host.endswith(".youtube.com")
+
+
+def clean(artist, title, source_url=""):
+    topic = bool(re.search(r"\s*-\s*Topic$", artist))
     artist = re.sub(r"\s*-\s*Topic$", "", artist).strip()
     title = NOISE.sub("", title).strip()
-    if not artist and " - " in title:
+    video = is_youtube(source_url)
+    if video:
+        title = title.split("|", 1)[0].strip()
+        title = re.sub(r'(?<=["”])\s+(?:song|video song|full video)$', "", title, flags=re.IGNORECASE)
+        title = title.strip().strip('"“”')
+    if (not artist or video) and " - " in title:
         artist, title = (part.strip() for part in title.split(" - ", 1))
+    elif video and not topic:
+        # YouTube's artist is often a channel or record label, not the performer.
+        artist = ""
     return artist, title
 
 
@@ -68,7 +82,7 @@ def folded(text):
     return re.sub(r"\W+", " ", text.casefold()).strip()
 
 
-def lookup(artist, title, album, seconds):
+def lookup(artist, title, album, seconds, video=False):
     """Match artist and duration, preferring exact titles before timed lyrics."""
     found = []
     busy = False
@@ -81,7 +95,7 @@ def lookup(artist, title, album, seconds):
         return (
             wanted in folded(entry.get("trackName") or "")
             and (not wanted_artist or wanted_artist == folded(entry.get("artistName") or ""))
-            and (seconds <= 0 or abs((entry.get("duration") or 0) - seconds) <= 8)
+            and (video or seconds <= 0 or abs((entry.get("duration") or 0) - seconds) <= 8)
             and (entry.get("syncedLyrics") or entry.get("plainLyrics") or entry.get("instrumental"))
         )
 
@@ -96,7 +110,7 @@ def lookup(artist, title, album, seconds):
             take([ask("get", params)])
         except Busy:
             busy = True
-        if found and found[0].get("syncedLyrics"):
+        if found and found[0].get("syncedLyrics") and abs((found[0].get("duration") or 0) - seconds) <= 8:
             return found[0]
 
     questions = [
@@ -110,6 +124,7 @@ def lookup(artist, title, album, seconds):
             busy = True
             continue
         if any(entry.get("syncedLyrics") and folded(entry.get("trackName") or "") == wanted
+               and (seconds <= 0 or abs((entry.get("duration") or 0) - seconds) <= 8)
                for entry in found):
             break
 
@@ -120,10 +135,24 @@ def lookup(artist, title, album, seconds):
 
     def rank(entry):
         offset = abs((entry.get("duration") or 0) - seconds) if seconds > 0 else 0
-        return (folded(entry.get("trackName") or "") != wanted,
+        return (seconds > 0 and offset > 8,
+                folded(entry.get("trackName") or "") != wanted,
                 not entry.get("syncedLyrics"), offset)
 
-    return min(found, key=rank)
+    entry = min(found, key=rank)
+    if video and not artist:
+        best_rank = rank(entry)
+        artists = {folded(candidate.get("artistName") or "")
+                   for candidate in found if rank(candidate) == best_rank}
+        if len(artists) > 1:
+            return None
+    if video and seconds > 0 and abs((entry.get("duration") or 0) - seconds) > 8:
+        # Music videos can include extra scenes. Their recording's timestamps
+        # cannot be applied to the video, but its words can still be displayed.
+        entry = {**entry, "syncedLyrics": "", "plainLyrics": entry.get("plainLyrics")
+                 or "\n".join(STAMP.sub("", line).strip()
+                              for line in (entry.get("syncedLyrics") or "").splitlines())}
+    return entry
 
 
 def parse(entry):
@@ -151,12 +180,16 @@ def parse(entry):
     return None
 
 
-def report(artist, title, album, seconds):
-    artist, title = clean(artist, title)
+def report(artist, title, album, seconds, source_url=""):
+    video = is_youtube(source_url)
+    artist, title = clean(artist, title, source_url)
     if not title:
         return {"available": False, "reason": "missing"}
 
-    key = hashlib.sha1(f"{artist}\n{title}\n{album}\n{round(seconds)}".encode()).hexdigest()
+    signature = f"{artist}\n{title}\n{album}\n{round(seconds)}"
+    if video:
+        signature = "youtube-v1\n" + signature
+    key = hashlib.sha1(signature.encode()).hexdigest()
     path = os.path.join(cache_dir(), f"{key}.json")
     try:
         with open(path, encoding="utf-8") as file:
@@ -171,7 +204,7 @@ def report(artist, title, album, seconds):
         pass
 
     try:
-        entry = lookup(artist, title, album, seconds)
+        entry = lookup(artist, title, album, seconds, video=video)
         result = (parse(entry) if entry else None) or {"available": False, "reason": "missing"}
     except Busy as error:
         sys.stderr.write(f"lyrics: {error}\n")
@@ -185,13 +218,13 @@ def report(artist, title, album, seconds):
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:] + [""] * 4
+    args = sys.argv[1:] + [""] * 5
     try:
         length = float(args[3] or 0)
     except ValueError:
         length = 0
     try:
-        print(json.dumps(report(args[0], args[1], args[2], length)))
+        print(json.dumps(report(args[0], args[1], args[2], length, args[4])))
     except Exception as error:
         sys.stderr.write(f"lyrics failed: {error}\n")
         print(json.dumps({"available": False, "reason": "network"}))

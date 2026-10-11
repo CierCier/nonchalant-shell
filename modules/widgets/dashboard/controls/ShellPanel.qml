@@ -49,55 +49,7 @@ Item {
         colorPickerCurrentColor = color;
     }
 
-    property string currentSection: ""
-
-    component SectionButton: StyledRect {
-        id: sectionBtn
-        required property string text
-        required property string sectionId
-
-        property bool isHovered: false
-
-        variant: isHovered ? "focus" : "pane"
-        Layout.fillWidth: true
-        Layout.preferredHeight: 56
-        radius: Styling.radius(0)
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 16
-
-            Text {
-                renderType: Text.NativeRendering
-                font.hintingPreference: Font.PreferFullHinting
-                text: sectionBtn.text
-                font.family: Config.theme.font
-                font.pixelSize: Styling.fontSize(0)
-                font.bold: true
-                color: Colors.overBackground
-                Layout.fillWidth: true
-            }
-
-            Text {
-                renderType: Text.NativeRendering
-                font.hintingPreference: Font.PreferFullHinting
-                text: Icons.caretRight
-                font.family: Icons.font
-                font.pixelSize: 20
-                color: Colors.overSurfaceVariant
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onEntered: sectionBtn.isHovered = true
-            onExited: sectionBtn.isHovered = false
-            onClicked: root.currentSection = sectionBtn.sectionId
-        }
-    }
+    property string currentSection: "bar"
 
     component ActionButton: StyledRect {
         id: actionBtn
@@ -596,35 +548,6 @@ Item {
             width: mainFlickable.width
             spacing: 8
 
-            // Header wrapper
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: titlebar.height
-
-                PanelTitlebar {
-                    id: titlebar
-                    width: root.contentWidth
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    title: root.currentSection === "" ? "Shell" : (root.currentSection.charAt(0).toUpperCase() + root.currentSection.slice(1))
-
-                    actions: {
-                        if (root.currentSection !== "") {
-                            return [
-                                {
-                                    icon: Icons.arrowLeft,
-                                    tooltip: "Back",
-                                    onClicked: function () {
-                                        root.currentSection = "";
-                                    }
-                                }
-                            ];
-                        }
-
-                        return [];
-                    }
-                }
-            }
-
             // Content wrapper - centered
             Item {
                 Layout.fillWidth: true
@@ -635,32 +558,6 @@ Item {
                     width: root.contentWidth
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 16
-
-                    // ═══════════════════════════════════════════════════════════════
-                    // MENU SECTION
-                    // ═══════════════════════════════════════════════════════════════
-                    ColumnLayout {
-                        visible: root.currentSection === ""
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        SectionButton {
-                            text: "Bar"
-                            sectionId: "bar"
-                        }
-                        SectionButton {
-                            text: "Sidebar"
-                            sectionId: "sidebar"
-                        }
-                        SectionButton {
-                            text: "Lockscreen"
-                            sectionId: "lockscreen"
-                        }
-                        SectionButton {
-                            text: "System"
-                            sectionId: "system"
-                        }
-                    }
 
                     // ═══════════════════════════════════════════════════════════════
                     // BAR SECTION

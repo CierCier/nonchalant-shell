@@ -7,6 +7,7 @@ with pkgs; [
   ffmpeg
   x264
   playerctl
+  yt-dlp
 
   # Audio
   pipewire

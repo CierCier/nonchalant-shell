@@ -57,11 +57,6 @@ Item {
         return page.tabs.length > 0 ? page.tabs[0].id : ""
     }
 
-    function categoryLabel(categoryId: string): string {
-        const category = settingsIndex.categories.find(entry => entry.id === categoryId)
-        return category ? category.label : ""
-    }
-
     function go(pageId: string, requestedTabId: string): void {
         const page = pageFor(pageId)
         const preferredTab = requestedTabId !== ""
@@ -157,8 +152,6 @@ Item {
         for (const page of settingsIndex.pages) {
             const matchingTabs = []
             for (const tab of page.tabs) {
-                if (tab.id === "overview")
-                    continue
                 const score = bestScore(query, tab.label, tab.keywords, "")
                 if (score >= 0) {
                     matchingTabs.push({
@@ -555,57 +548,6 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 12
-
-                StyledRect {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    variant: "pane"
-                    radius: Styling.radius(0)
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.currentPage.icon
-                        font.family: Icons.font
-                        font.pixelSize: 24
-                        color: Styling.srItem("overprimary")
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    Text {
-                        text: root.categoryLabel(root.currentPage.category)
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(-2)
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: 0.8
-                        color: Colors.overSurfaceVariant
-                    }
-
-                    Text {
-                        text: root.currentPage.label
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(2)
-                        font.weight: Font.Bold
-                        color: Colors.overBackground
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: root.currentPage.description
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(-1)
-                        color: Colors.overSurfaceVariant
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
                 Layout.preferredHeight: visible ? 36 : 0
                 spacing: 4
                 visible: root.currentPage.tabs.length > 0
@@ -647,6 +589,7 @@ Item {
 
             Loader {
                 id: panelLoader
+                objectName: "settingsPanelLoader"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 asynchronous: true
@@ -662,6 +605,8 @@ Item {
                 }
 
                 onLoaded: {
+                    // Settings owns navigation and offers the full pane width.
+                    panelLoader.item.maxContentWidth = Qt.binding(() => panelLoader.width)
                     root.loadedPageId = root.currentPageId
                     root.applyCurrentPanelTab()
                     root.resetCurrentPageScroll()

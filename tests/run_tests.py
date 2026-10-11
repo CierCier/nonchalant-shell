@@ -175,6 +175,7 @@ def main():
     if run_all or args.tier1:
         run_unittest_suite("Tier 1: Feature Coverage", "tests.unit.test_tier1_features", collector, args.verbose)
         run_unittest_suite("Tier 1: Lyrics Lookup", "tests.unit.test_lyrics", collector, args.verbose)
+        run_unittest_suite("Tier 1: Media Duration", "tests.unit.test_media_duration", collector, args.verbose)
 
     if run_all or args.tier2:
         run_unittest_suite("Tier 2: Boundary & Corner Cases", "tests.unit.test_tier2_boundaries", collector, args.verbose)
@@ -185,6 +186,7 @@ def main():
     if run_all or args.tier4:
         run_unittest_suite("Tier 4: Real-World Scenarios", "tests.e2e.test_tier4_lifecycle", collector, args.verbose)
         run_unittest_suite("Tier 4: Settings and Lyrics Runtime", "tests.e2e.test_settings_lyrics_runtime", collector, args.verbose)
+        run_unittest_suite("Tier 4: MPRIS Duration Runtime", "tests.e2e.test_mpris_runtime", collector, args.verbose)
 
     if args.json:
         report = {

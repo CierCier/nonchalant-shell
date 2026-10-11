@@ -14,8 +14,8 @@ StyledRect {
     variant: "bg"
 
     property bool isPlaying: MprisController.activePlayer?.playbackState === MprisPlaybackState.Playing
-    property real position: MprisController.activePlayer?.position ?? 0.0
-    property real length: MprisController.activePlayer?.length ?? 1.0
+    property real position: MprisController.position
+    property real length: MprisController.length
     property bool hasArtwork: (MprisController.activePlayer?.trackArtUrl ?? "") !== ""
     property string wallpaperPath: {
         if (!GlobalStates.wallpaperManager) return "";
@@ -79,27 +79,6 @@ StyledRect {
         }
     }
 
-    Timer {
-        running: lockPlayer.isPlaying && lockPlayer.visible
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            if (!positionSlider.isDragging) {
-                positionSlider.value = lockPlayer.length > 0 ? Math.min(1.0, lockPlayer.position / lockPlayer.length) : 0;
-            }
-            MprisController.activePlayer?.positionChanged();
-        }
-    }
-
-    Connections {
-        target: MprisController.activePlayer
-        function onPositionChanged() {
-            if (!positionSlider.isDragging && MprisController.activePlayer) {
-                positionSlider.value = lockPlayer.length > 0 ? Math.min(1.0, lockPlayer.position / lockPlayer.length) : 0;
-            }
-        }
-    }
-
     Item {
         id: noPlayerContainer
         anchors.fill: parent
@@ -143,15 +122,6 @@ StyledRect {
         visible: MprisController.activePlayer || wallpaperPath !== ""
 
         // Album artwork con botón de play/pause superpuesto
-    Connections {
-        target: MprisController
-        function onActivePlayerChanged() {
-            if (!MprisController.activePlayer) {
-                positionSlider.value = 0;
-            }
-        }
-    }
-
     Item {
 
             Layout.preferredWidth: 64
@@ -290,6 +260,7 @@ StyledRect {
                     opacity: 0.7
                 }
                 LyricsView {
+                    collapseWhenEmpty: true
                     Layout.fillWidth: true
                     Layout.preferredHeight: 22
                     mode: "detail"

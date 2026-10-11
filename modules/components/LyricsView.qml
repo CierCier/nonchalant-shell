@@ -12,10 +12,17 @@ Item {
     property bool lyricsEnabled: Config.bar.lyricsEnabled
     property bool active: false
     property bool subscribed: false
+    property bool collapseWhenEmpty: false
+    readonly property bool hasLyrics: root.hasTrack && root.lyricsEnabled
+        && LyricsService.available && !LyricsService.instrumental && LyricsService.lines.length > 0
+    visible: !root.collapseWhenEmpty || root.hasLyrics
 
     implicitHeight: root.mode === "detail" ? 140 : 22
     readonly property bool shouldRender: root.active && root.visible
         && root.width > 0 && root.height > 0
+    // Empty media views still request lyrics while their owning panel is open.
+    readonly property bool shouldSubscribe: root.active && root.lyricsEnabled
+        && (root.collapseWhenEmpty || root.shouldRender)
 
     readonly property bool hasTrack: MprisController.activePlayer !== null
         && MprisController.trackTitle.trim() !== ""
@@ -45,18 +52,16 @@ Item {
     }
 
     function syncSubscription(): void {
-        const shouldSubscribe = root.shouldRender && root.lyricsEnabled;
-        if (shouldSubscribe === root.subscribed)
+        if (root.shouldSubscribe === root.subscribed)
             return;
-        root.subscribed = shouldSubscribe;
-        if (shouldSubscribe)
+        root.subscribed = root.shouldSubscribe;
+        if (root.subscribed)
             LyricsService.subscribe();
         else
             LyricsService.release();
     }
 
-    onShouldRenderChanged: root.syncSubscription()
-    onLyricsEnabledChanged: root.syncSubscription()
+    onShouldSubscribeChanged: root.syncSubscription()
     Component.onCompleted: root.syncSubscription()
     Component.onDestruction: {
         if (root.subscribed)

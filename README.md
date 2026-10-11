@@ -87,13 +87,36 @@ controls use the same configuration store.
 
 Lyrics follow the selected MPRIS player. Timed lines follow playback and can be
 clicked to seek; plain lyrics scroll manually. Shell settings provide separate
-bar and lockscreen switches. When a lyrics view is visible, track title, artist,
+media-player and lockscreen switches. The collapsed bar keeps showing the track
+or focused window title. Media panels collapse the lyrics area until usable
+lyrics arrive. While a media panel is open, track title, artist,
 album, and duration are sent to [LRCLIB](https://lrclib.net). Results are cached
-under `$XDG_STATE_HOME/nonchalant/lyrics`. Hidden views do not start new lookups
+under `$XDG_STATE_HOME/nonchalant/lyrics`. Closed panels do not start new lookups
 or retries. Changing tracks or closing the last active lyrics view cancels the
 old lookup and discards its output.
 Retries are scheduled by the active lyrics service, not by the Python helper.
 The lyrics helper requires Python 3.
+
+YouTube playback uses the video title to identify the song instead of treating
+its upload channel as the artist. Matching video-length recordings can provide
+timed lyrics. When only a different-length recording is available, its lyrics
+scroll manually. Videos without an identifiable song or an unambiguous match
+can still have no lyrics.
+YouTube duration is verified from the selected video's own metadata with
+`yt-dlp`, including when a browser omits duration or keeps the previous video's
+length. Only the canonical video ID is sent to YouTube. No media is downloaded
+and no browser cookies or yt-dlp user configuration are used. Verified durations
+are cached for 24 hours in `$XDG_STATE_HOME/nonchalant/media-duration`. Failed
+requests retry with backoff; track changes cancel extraction and discard stale
+results. Install `yt-dlp` alongside Python 3 for this integration.
+
+Native player durations remain authoritative for other media. A valid duration
+is retained for the same track when a later MPRIS update omits it, and cleared
+on track or player changes. Live streams have no finite total. Progress and
+fractional seeking use the shared duration in every media view.
+
+This repairs duration reporting in the shell. It does not patch Firefox's
+separate upstream bug where Position can become zero after seeking.
 
 
 ## Run the development tree
