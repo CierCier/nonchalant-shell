@@ -135,7 +135,7 @@ class DynamicIslandStateMachine:
             self.history.append(new_state)
 
     def _evaluate_state(self):
-        if self.style != BarStyle.ISLAND:
+        if self.style == BarStyle.DEFAULT:
             self._transition_to(IslandState.RESTING_VISIBLE)
             return
 
