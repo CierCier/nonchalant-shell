@@ -82,33 +82,46 @@ class TestPillsBarLayout(unittest.TestCase):
         self.assertIn("Visibilities.closeActiveBarPopup()", self.pills_content)
 
     def test_separate_floating_pills_in_collapsed_state(self):
-        """PillsBar renders distinct separate pills in the collapsed state."""
-        # Workspaces Pill
-        self.assertIn("id: workspacesPill", self.pills_content)
-        self.assertIn("NonchalantTaskbar", self.pills_content)
-        self.assertIn("showBackground: false", self.pills_content)
-        self.assertIn('root.expand("apps")', self.pills_content)
-
-        # Context / Title Pill
+        """PillsBar renders distinct separate pills corresponding exactly to Dynamic Island elements."""
+        # 1. Context / Title Pill (Active Window / Media Title with live progress)
         self.assertIn("id: contextPill", self.pills_content)
         self.assertIn("FluidTextProgress", self.pills_content)
         self.assertIn("root.contextLabel", self.pills_content)
         self.assertIn('root.expand("media")', self.pills_content)
+        self.assertIn('root.expand("apps")', self.pills_content)
 
-        # Clock & Date Pill
-        self.assertIn("id: clockPill", self.pills_content)
+        # 2. Time Pill
+        self.assertIn("id: timePill", self.pills_content)
         self.assertIn("root.formattedTime", self.pills_content)
-        self.assertIn("root.formattedDate", self.pills_content)
         self.assertIn('root.expand("dashboard")', self.pills_content)
         self.assertIn('root.expand("calendar")', self.pills_content)
 
-        # Status & Indicators Pill
+        # 3. Workspaces Switcher Pill
+        self.assertIn("id: workspacesPill", self.pills_content)
+        self.assertIn("NonchalantTaskbar", self.pills_content)
+        self.assertIn("showBackground: false", self.pills_content)
+
+        # 4. Status Icons Pill (Dynamic Volume, Brightness, Battery)
         self.assertIn("id: statusPill", self.pills_content)
-        self.assertIn("AudioFormatBadge", self.pills_content)
         self.assertIn("IslandStatusIcons", self.pills_content)
-        self.assertIn("NetworkService", self.pills_content)
-        self.assertIn("BluetoothService", self.pills_content)
+
+        # 5. Alerts Indicator Pill
+        self.assertIn("id: alertsPill", self.pills_content)
+        self.assertIn("root.alertsCount", self.pills_content)
+        self.assertIn('root.expand("alerts")', self.pills_content)
+
+        # 6. Pin Toggle Pill
+        self.assertIn("id: pinPill", self.pills_content)
         self.assertIn("Config.bar.pinned", self.pills_content)
+
+    def test_collapsed_pills_do_not_contain_default_bar_widgets(self):
+        """Collapsed pills layer must not contain DefaultBar widgets (AudioFormatBadge, NetworkService, etc.)."""
+        collapsed_marker = "COLLAPSED BAR STATE: SEPARATE FLOATING PILLS"
+        expanded_marker = "EXPANDED STATE: UNIFIED FLOATING CARD"
+        collapsed_section = self.pills_content.split(collapsed_marker)[1].split(expanded_marker)[0]
+        self.assertNotIn("AudioFormatBadge", collapsed_section)
+        self.assertNotIn("NetworkService", collapsed_section)
+        self.assertNotIn("BluetoothService", collapsed_section)
 
     def test_fluid_spring_animations(self):
         """Morphing container uses organic spring overshoot for expand and monotonic for collapse."""
@@ -152,7 +165,7 @@ class TestPillsBarLayout(unittest.TestCase):
         """Interactive pills and buttons implement cohesive tactile scaling with PressBehavior."""
         self.assertIn("PressBehavior on scale", self.pills_content)
         self.assertIn("scale: contextMouse.pressed ? 0.94 : 1.0", self.pills_content)
-        self.assertIn("scale: clockMouse.pressed ? 0.94 : 1.0", self.pills_content)
+        self.assertIn("scale: timeMouse.pressed ? 0.94 : 1.0", self.pills_content)
 
     def test_visibilities_and_ipc_integration(self):
         """Visibilities recognizes pills as an island-like style for seamless IPC."""

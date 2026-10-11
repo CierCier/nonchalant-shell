@@ -742,77 +742,11 @@ Item {
                 anchors.centerIn: parent
                 spacing: 8
 
-                // ── PILL 1: WORKSPACES & APP LAUNCHER PILL ──
-                StyledRect {
-                    id: workspacesPill
-                    implicitHeight: root.pillHeight
-                    implicitWidth: workspacesRow.implicitWidth + 12
-                    variant: "pane"
-                    radius: root.pillRadius
-                    enableBorder: true
-                    enableShadow: true
-                    backgroundOpacity: 1.0
-
-                    RowLayout {
-                        id: workspacesRow
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        // App Launcher trigger button
-                        Item {
-                            implicitWidth: 26
-                            implicitHeight: 26
-                            Layout.alignment: Qt.AlignVCenter
-                            scale: launcherMouse.pressed ? 0.92 : 1.0
-
-                            PressBehavior on scale {
-                                pressed: launcherMouse.pressed
-                            }
-
-                            StyledRect {
-                                anchors.fill: parent
-                                radius: 13
-                                variant: launcherMouse.containsMouse ? "focus" : "transparent"
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: Icons.gear
-                                    font.family: Icons.font
-                                    font.pixelSize: 14
-                                    color: launcherMouse.containsMouse ? Colors.primary : Colors.overBackground
-                                    renderType: Text.NativeRendering
-                                }
-                            }
-
-                            MouseArea {
-                                id: launcherMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.expand("apps")
-                            }
-
-                            StyledToolTip {
-                                show: launcherMouse.containsMouse
-                                tooltipText: "Applications"
-                                description: "Click to launch apps and switch projects"
-                            }
-                        }
-
-                        // Workspaces switcher
-                        NonchalantTaskbar {
-                            Layout.alignment: Qt.AlignVCenter
-                            bar: root
-                            showBackground: false
-                        }
-                    }
-                }
-
-                // ── PILL 2: CONTEXT / WINDOW TITLE / MEDIA PILL ──
+                // ── PILL 1: CONTEXT PILL (ACTIVE WINDOW / MEDIA TITLE) ──
                 StyledRect {
                     id: contextPill
                     implicitHeight: root.pillHeight
-                    implicitWidth: Math.min(contextContentRow.implicitWidth + 24, 260)
+                    implicitWidth: Math.min(fluidContextText.implicitWidth + 24, 224)
                     variant: "pane"
                     radius: root.pillRadius
                     enableBorder: true
@@ -824,28 +758,14 @@ Item {
                         pressed: contextMouse.pressed
                     }
 
-                    RowLayout {
-                        id: contextContentRow
+                    Item {
                         anchors.fill: parent
                         anchors.leftMargin: 12
                         anchors.rightMargin: 12
-                        spacing: 6
-
-                        Text {
-                            visible: root.isMediaPlaying
-                            text: Icons.player
-                            font.family: Icons.font
-                            font.pixelSize: 13
-                            color: Colors.primary
-                            renderType: Text.NativeRendering
-                            Layout.alignment: Qt.AlignVCenter
-                        }
 
                         FluidTextProgress {
                             id: fluidContextText
-                            Layout.fillWidth: true
-                            implicitHeight: 20
-                            Layout.alignment: Qt.AlignVCenter
+                            anchors.fill: parent
                             text: root.contextLabel
                             fontFamily: Config.theme.font
                             pixelSize: Styling.fontSize(-1)
@@ -876,51 +796,39 @@ Item {
                     StyledToolTip {
                         show: contextMouse.containsMouse
                         tooltipText: root.isMediaPlaying ? "Now Playing: " + root.contextLabel : (root.screenFocusedClient?.title || "Active Window")
-                        description: root.isMediaPlaying ? "Click to open Media Center" : "Click to search applications"
+                        description: root.isMediaPlaying ? "Click to open Media Center" : "Click to switch windows / apps"
                     }
                 }
 
-                // ── PILL 3: CLOCK & DATE PILL ──
+                // ── PILL 2: TIME PILL ──
                 StyledRect {
-                    id: clockPill
+                    id: timePill
                     implicitHeight: root.pillHeight
-                    implicitWidth: clockContentRow.implicitWidth + 24
+                    implicitWidth: timeText.implicitWidth + 24
                     variant: "pane"
                     radius: root.pillRadius
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
-                    scale: clockMouse.pressed ? 0.94 : 1.0
+                    scale: timeMouse.pressed ? 0.94 : 1.0
 
                     PressBehavior on scale {
-                        pressed: clockMouse.pressed
+                        pressed: timeMouse.pressed
                     }
 
-                    RowLayout {
-                        id: clockContentRow
+                    Text {
+                        id: timeText
                         anchors.centerIn: parent
-                        spacing: 8
-
-                        Text {
-                            text: root.formattedTime
-                            font.family: Config.theme.monoFont
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.bold: true
-                            color: clockMouse.containsMouse ? Colors.primary : Colors.overBackground
-                            renderType: Text.NativeRendering
-                        }
-
-                        Text {
-                            text: root.formattedDate
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            color: Colors.overSurfaceVariant
-                            renderType: Text.NativeRendering
-                        }
+                        text: root.formattedTime
+                        font.family: Config.theme.monoFont
+                        font.pixelSize: Styling.fontSize(-1)
+                        font.bold: true
+                        color: timeMouse.containsMouse ? Colors.primary : Colors.overBackground
+                        renderType: Text.NativeRendering
                     }
 
                     MouseArea {
-                        id: clockMouse
+                        id: timeMouse
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -935,228 +843,146 @@ Item {
                     }
 
                     StyledToolTip {
-                        show: clockMouse.containsMouse
-                        tooltipText: "Left-click: Dashboard • Right-click: Calendar"
+                        show: timeMouse.containsMouse
+                        tooltipText: root.formattedDate
+                        description: "Left-click: Dashboard • Right-click: Calendar"
                     }
                 }
 
-                // ── PILL 4: STATUS & INDICATORS PILL ──
+                // ── PILL 3: WORKSPACES PILL ──
                 StyledRect {
-                    id: statusPill
+                    id: workspacesPill
                     implicitHeight: root.pillHeight
-                    implicitWidth: statusPillRow.implicitWidth + 14
+                    implicitWidth: taskbar.implicitWidth + 12
                     variant: "pane"
                     radius: root.pillRadius
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
 
+                    NonchalantTaskbar {
+                        id: taskbar
+                        anchors.centerIn: parent
+                        bar: root
+                        showBackground: false
+                    }
+                }
+
+                // ── PILL 4: STATUS ICONS PILL (BRIGHTNESS, VOLUME, BATTERY) ──
+                StyledRect {
+                    id: statusPill
+                    implicitHeight: root.pillHeight
+                    implicitWidth: statusIcons.implicitWidth + 16
+                    variant: "pane"
+                    radius: root.pillRadius
+                    enableBorder: true
+                    enableShadow: true
+                    backgroundOpacity: 1.0
+
+                    IslandStatusIcons {
+                        id: statusIcons
+                        anchors.centerIn: parent
+                        bar: root
+                    }
+                }
+
+                // ── PILL 5: ALERTS PILL (NOTIFICATION COUNTER) ──
+                StyledRect {
+                    id: alertsPill
+                    visible: !Notifications.silent && (root.alertsCount > 0 || root.hasNotifications)
+                    implicitHeight: root.pillHeight
+                    implicitWidth: alertsRow.implicitWidth + 16
+                    variant: "pane"
+                    radius: root.pillRadius
+                    enableBorder: true
+                    enableShadow: true
+                    backgroundOpacity: 1.0
+                    scale: alertsMouse.pressed ? 0.90 : 1.0
+
+                    PressBehavior on scale {
+                        pressed: alertsMouse.pressed
+                    }
+
                     RowLayout {
-                        id: statusPillRow
+                        id: alertsRow
                         anchors.centerIn: parent
                         spacing: 4
 
-                        // Audio format badge (bt / usb / wired headphones)
-                        AudioFormatBadge {
-                            enableShadow: false
-                            startRadius: root.pillRadius
-                            endRadius: root.pillRadius
+                        Text {
+                            text: Icons.bell
+                            font.family: Icons.font
+                            font.pixelSize: 13
+                            color: root.hasNotifications ? Colors.primary : (alertsMouse.containsMouse ? Colors.primary : Colors.overBackground)
+                            renderType: Text.NativeRendering
                         }
 
-                        // Dynamic Status Icons (Brightness, Volume, Battery)
-                        IslandStatusIcons {
-                            bar: root
+                        Text {
+                            text: String(root.alertsCount)
+                            font.family: Config.theme.monoFont
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.bold: true
+                            color: root.hasNotifications ? Colors.primary : (alertsMouse.containsMouse ? Colors.primary : Colors.overBackground)
+                            renderType: Text.NativeRendering
                         }
+                    }
 
-                        // Wi-Fi / Network indicator button
-                        Item {
-                            implicitWidth: 24
-                            implicitHeight: 24
-                            Layout.alignment: Qt.AlignVCenter
-                            scale: wifiMouse.pressed ? 0.92 : 1.0
+                    MouseArea {
+                        id: alertsMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.expand("alerts")
+                    }
 
-                            PressBehavior on scale {
-                                pressed: wifiMouse.pressed
-                            }
+                    StyledToolTip {
+                        show: alertsMouse.containsMouse
+                        tooltipText: root.alertsCount + " notification" + (root.alertsCount === 1 ? "" : "s")
+                        description: "Click to open alerts panel"
+                    }
+                }
 
-                            StyledRect {
-                                anchors.fill: parent
-                                radius: 12
-                                variant: wifiMouse.containsMouse ? "focus" : "transparent"
+                // ── PILL 6: PIN BUTTON PILL ──
+                StyledRect {
+                    id: pinPill
+                    implicitHeight: root.pillHeight
+                    implicitWidth: root.pillHeight
+                    variant: "pane"
+                    radius: root.pillRadius
+                    enableBorder: true
+                    enableShadow: true
+                    backgroundOpacity: 1.0
+                    scale: pinMouse.pressed ? 0.92 : 1.0
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: NetworkService.wifiEnabled
-                                        ? (NetworkService.wifiConnected ? Icons.wifiHigh : Icons.wifiLow)
-                                        : Icons.ethernet
-                                    font.family: Icons.font
-                                    font.pixelSize: 13
-                                    color: NetworkService.wifiConnected
-                                        ? (wifiMouse.containsMouse ? Colors.primary : Colors.overBackground)
-                                        : Colors.overSurfaceVariant
-                                    renderType: Text.NativeRendering
-                                }
-                            }
+                    PressBehavior on scale {
+                        pressed: pinMouse.pressed
+                    }
 
-                            MouseArea {
-                                id: wifiMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.expand("wifi")
-                            }
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.isPinned ? Icons.pin : Icons.unpin
+                        font.family: Icons.font
+                        font.pixelSize: 13
+                        color: root.isPinned ? Colors.primary : (pinMouse.containsMouse ? Colors.primary : Colors.overBackground)
+                        opacity: root.isPinned ? 1.0 : (pinMouse.containsMouse ? 1.0 : 0.7)
+                        renderType: Text.NativeRendering
+                    }
 
-                            StyledToolTip {
-                                show: wifiMouse.containsMouse
-                                tooltipText: NetworkService.wifiConnected
-                                    ? ("Wi-Fi: " + (NetworkService.activeSsid || "Connected"))
-                                    : "Wi-Fi Networks"
-                            }
-                        }
-
-                        // Bluetooth indicator button
-                        Item {
-                            implicitWidth: 24
-                            implicitHeight: 24
-                            Layout.alignment: Qt.AlignVCenter
-                            scale: btMouse.pressed ? 0.92 : 1.0
-
-                            PressBehavior on scale {
-                                pressed: btMouse.pressed
-                            }
-
-                            StyledRect {
-                                anchors.fill: parent
-                                radius: 12
-                                variant: btMouse.containsMouse ? "focus" : "transparent"
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: BluetoothService.connected
-                                        ? Icons.bluetoothConnected
-                                        : (BluetoothService.enabled ? Icons.bluetooth : Icons.bluetoothOff)
-                                    font.family: Icons.font
-                                    font.pixelSize: 13
-                                    color: BluetoothService.enabled
-                                        ? (btMouse.containsMouse ? Colors.primary : Colors.overBackground)
-                                        : Colors.overSurfaceVariant
-                                    renderType: Text.NativeRendering
-                                }
-                            }
-
-                            MouseArea {
-                                id: btMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.expand("bluetooth")
-                            }
-
-                            StyledToolTip {
-                                show: btMouse.containsMouse
-                                tooltipText: BluetoothService.connected ? "Bluetooth: Connected" : (BluetoothService.enabled ? "Bluetooth: On" : "Bluetooth: Off")
+                    MouseArea {
+                        id: pinMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (Config.bar) {
+                                Config.bar.pinned = !root.isPinned;
                             }
                         }
+                    }
 
-                        // Alerts bell icon (if notifications active)
-                        Item {
-                            visible: !Notifications.silent && (root.alertsCount > 0 || root.hasNotifications)
-                            implicitWidth: 24
-                            implicitHeight: 24
-                            Layout.alignment: Qt.AlignVCenter
-                            scale: alertsMouse.pressed ? 0.92 : 1.0
-
-                            PressBehavior on scale {
-                                pressed: alertsMouse.pressed
-                            }
-
-                            StyledRect {
-                                anchors.fill: parent
-                                radius: 12
-                                variant: alertsMouse.containsMouse ? "focus" : "transparent"
-
-                                RowLayout {
-                                    anchors.centerIn: parent
-                                    spacing: 2
-
-                                    Text {
-                                        text: Icons.bell
-                                        font.family: Icons.font
-                                        font.pixelSize: 12
-                                        color: Colors.primary
-                                        renderType: Text.NativeRendering
-                                    }
-
-                                    Text {
-                                        text: String(root.alertsCount)
-                                        font.family: Config.theme.monoFont
-                                        font.pixelSize: Styling.fontSize(-3)
-                                        font.bold: true
-                                        color: Colors.primary
-                                        renderType: Text.NativeRendering
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                id: alertsMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.expand("alerts")
-                            }
-
-                            StyledToolTip {
-                                show: alertsMouse.containsMouse
-                                tooltipText: root.alertsCount + " notification" + (root.alertsCount === 1 ? "" : "s")
-                            }
-                        }
-
-                        // Pin toggle button
-                        Item {
-                            implicitWidth: 22
-                            implicitHeight: 22
-                            Layout.alignment: Qt.AlignVCenter
-
-                            StyledRect {
-                                anchors.fill: parent
-                                radius: 11
-                                variant: pinMouse.containsMouse ? "focus" : "transparent"
-                                scale: pinMouse.pressed ? 0.92 : 1.0
-
-                                PressBehavior on scale {
-                                    pressed: pinMouse.pressed
-                                }
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: root.isPinned ? Icons.pin : Icons.unpin
-                                    font.family: Icons.font
-                                    font.pixelSize: 13
-                                    color: root.isPinned ? Colors.primary : (pinMouse.containsMouse ? Colors.primary : Colors.overBackground)
-                                    opacity: root.isPinned ? 1.0 : (pinMouse.containsMouse ? 1.0 : 0.7)
-                                    renderType: Text.NativeRendering
-                                }
-                            }
-
-                            MouseArea {
-                                id: pinMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (Config.bar) {
-                                        Config.bar.pinned = !root.isPinned;
-                                    }
-                                }
-                            }
-
-                            StyledToolTip {
-                                show: pinMouse.containsMouse
-                                tooltipText: root.isPinned ? "Unpin Bar" : "Pin Bar"
-                                description: root.isPinned ? "Autohide disabled (reserves window space)" : "Keep floating bar visible and reserve window space"
-                            }
-                        }
+                    StyledToolTip {
+                        show: pinMouse.containsMouse
+                        tooltipText: root.isPinned ? "Unpin Bar" : "Pin Bar"
+                        description: root.isPinned ? "Autohide disabled (reserves window space)" : "Keep floating bar visible and reserve window space"
                     }
                 }
             }
