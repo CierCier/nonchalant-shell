@@ -48,6 +48,17 @@ Item {
     readonly property bool isExpanded: currentMode !== "collapsed" && !retractingToHidden
     readonly property bool islandActive: isExpanded && currentMode !== "notification" && currentMode !== "osd"
 
+    property bool isMorphing: false
+
+    Timer {
+        id: morphCollapseTimer
+        interval: Motion.collapseDuration + 40
+        repeat: false
+        onTriggered: {
+            root.isMorphing = false;
+        }
+    }
+
     function finishRetraction() {
         if (root.retractingToHidden) {
             slideUpAnim.stop();
@@ -56,6 +67,8 @@ Item {
             root.openedFromHidden = false;
             root.currentMode = "collapsed";
             root.retractingToHidden = false;
+            root.isMorphing = false;
+            morphCollapseTimer.stop();
             root.containerY = -(root.pillHeight + root.topMargin + 10);
         }
     }
@@ -98,7 +111,14 @@ Item {
         root.retractingToHidden = false;
         retractFinishTimer.stop();
         slideUpAnim.stop();
+        const wasFromHidden = root.openedFromHidden;
         root.openedFromHidden = false;
+        if (!wasFromHidden) {
+            root.isMorphing = true;
+            morphCollapseTimer.restart();
+        } else {
+            root.isMorphing = false;
+        }
         root.currentMode = "collapsed";
         root.animateReveal(root.shouldBeRevealed ? 0 : -(root.pillHeight + root.topMargin + 10));
     }
@@ -123,7 +143,9 @@ Item {
         if (root.currentMode !== mode) {
             root.previousMode = root.currentMode;
         }
+        morphCollapseTimer.stop();
         root.updateSourcePill(mode || "dashboard");
+        root.isMorphing = !wasHidden;
         root.snapGeometry = wasHidden;
         root.currentMode = mode || "dashboard";
         root.snapGeometry = false;
@@ -537,13 +559,13 @@ Item {
     }
     readonly property real sourcePillWidth: resolvedSourcePill ? resolvedSourcePill.width : root.pillHeight
 
-    readonly property int targetCardWidth: root.isExpanded ? root.targetWidth : Math.round(sourcePillWidth)
-    readonly property int targetCardHeight: root.isExpanded ? root.targetHeight : root.pillHeight
-    readonly property real targetCardX: root.isExpanded
+    readonly property int targetCardWidth: (root.isExpanded || root.openedFromHidden) ? root.targetWidth : Math.round(sourcePillWidth)
+    readonly property int targetCardHeight: (root.isExpanded || root.openedFromHidden) ? root.targetHeight : root.pillHeight
+    readonly property real targetCardX: (root.isExpanded || root.openedFromHidden)
         ? Math.round((root.width - root.targetWidth) / 2)
         : sourcePillLeftInRoot
     readonly property real targetCardRadius: root.isExpanded ? root.panelRadius : root.pillRadius
-    readonly property real targetCardOpacity: root.isExpanded ? root.contentReveal : 0.0
+    readonly property real targetCardOpacity: (root.isExpanded || root.retractingToHidden || root.isMorphing) ? 1.0 : 0.0
 
     onCurrentModeChanged: {
         if (currentMode !== "collapsed" && !root.retractingToHidden) {
@@ -755,17 +777,17 @@ Item {
         y: root.topMargin + root.containerY
         width: pillsRow.implicitWidth
         height: root.pillHeight
-        visible: opacity > 0.001 && root.revealProgress > 0.001
-        enabled: !root.isExpanded
-        opacity: root.isExpanded ? 0.0 : root.contentReveal
+        visible: !root.isExpanded && !root.retractingToHidden && !root.openedFromHidden && !root.isMorphing && root.revealProgress > 0.001
+        enabled: !root.isExpanded && !root.retractingToHidden && !root.isMorphing
+        opacity: (root.isExpanded || root.retractingToHidden || root.openedFromHidden || root.isMorphing) ? 0.0 : root.contentReveal
 
-            Behavior on opacity {
-                enabled: Motion.enabled
-                NumberAnimation {
-                    duration: root.isExpanded ? Motion.fadeOutDuration : Motion.fadeInDuration
-                    easing.type: Easing.OutCubic
-                }
+        Behavior on opacity {
+            enabled: Motion.enabled
+            NumberAnimation {
+                duration: Motion.fadeOutDuration
+                easing.type: Easing.OutCubic
             }
+        }
 
             RowLayout {
                 id: pillsRow
@@ -1033,12 +1055,12 @@ Item {
         enableShadow: true
         backgroundOpacity: 1.0
         clip: true
-        visible: opacity > 0.001 && root.revealProgress > 0.001
-        opacity: root.targetCardOpacity
+        visible: (root.isExpanded || root.retractingToHidden || root.isMorphing) && root.revealProgress > 0.001
+        opacity: (root.isExpanded || root.retractingToHidden || root.isMorphing) ? 1.0 : 0.0
         z: 10
 
         Behavior on x {
-            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && root.isMorphing && !root.snapGeometry
             NumberAnimation {
                 duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
                 easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
@@ -1047,7 +1069,7 @@ Item {
         }
 
         Behavior on width {
-            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && root.isMorphing && !root.snapGeometry
             NumberAnimation {
                 duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
                 easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
@@ -1056,7 +1078,7 @@ Item {
         }
 
         Behavior on height {
-            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && root.isMorphing && !root.snapGeometry
             NumberAnimation {
                 duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
                 easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
@@ -1064,20 +1086,68 @@ Item {
             }
         }
 
-        Behavior on radius {
-            enabled: Motion.enabled
-            NumberAnimation {
-                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
-                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
-                easing.overshoot: Motion.overshoot
-            }
-        }
+        // Preview header showing the source pill's visual label during transit
+        Item {
+            id: pillMorphPreview
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width
+            height: root.pillHeight
+            visible: opacity > 0.001
+            opacity: root.targetCardHeight <= (root.pillHeight + 50) ? 1.0 : 0.0
 
-        Behavior on opacity {
-            enabled: Motion.enabled
-            NumberAnimation {
-                duration: root.isExpanded ? Motion.fadeInDuration : Motion.fadeOutDuration
-                easing.type: Easing.OutCubic
+            Behavior on opacity {
+                enabled: Motion.enabled
+                NumberAnimation {
+                    duration: Motion.fadeOutDuration
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Text {
+                anchors.centerIn: parent
+                visible: root.activeSourcePill === timePill || root.currentMode === "dashboard" || root.currentMode === "calendar"
+                text: root.formattedTime
+                font.family: Config.theme.monoFont
+                font.pixelSize: Styling.fontSize(-1)
+                font.bold: true
+                color: Colors.overBackground
+                renderType: Text.NativeRendering
+            }
+
+            Text {
+                anchors.centerIn: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                visible: root.activeSourcePill === contextPill || root.currentMode === "media" || root.currentMode === "apps"
+                text: root.contextLabel
+                font.family: Config.theme.font
+                font.pixelSize: Styling.fontSize(-1)
+                font.bold: true
+                elide: Text.ElideRight
+                color: Colors.overBackground
+                renderType: Text.NativeRendering
+            }
+
+            RowLayout {
+                anchors.centerIn: parent
+                spacing: 6
+                visible: root.activeSourcePill === statusPill || root.currentMode === "sound" || root.currentMode === "battery" || root.currentMode === "stats" || root.currentMode === "osd"
+
+                Text {
+                    text: root.batteryIcon
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 16
+                    color: root.batteryColor
+                    renderType: Text.NativeRendering
+                }
+                Text {
+                    text: root.audioMuted ? "volume_off" : "volume_up"
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 16
+                    color: root.audioMuted ? Colors.error : Colors.overBackground
+                    renderType: Text.NativeRendering
+                }
             }
         }
 

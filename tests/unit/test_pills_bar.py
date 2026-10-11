@@ -201,9 +201,9 @@ class TestPillsBarLayout(unittest.TestCase):
         self.assertIn("x: root.targetCardX", self.pills_content)
         self.assertIn("width: root.targetCardWidth", self.pills_content)
         self.assertIn("height: root.targetCardHeight", self.pills_content)
-        self.assertIn("radius: root.targetCardRadius", self.pills_content)
         self.assertIn("Behavior on x", self.pills_content)
-        self.assertIn("Behavior on radius", self.pills_content)
+        self.assertIn("root.isMorphing", self.pills_content)
+        self.assertIn("pillMorphPreview", self.pills_content)
         # Source pill resolution
         self.assertIn("sourcePillForMode(mode: string)", self.pills_content)
         self.assertIn("updateSourcePill(mode: string)", self.pills_content)
