@@ -69,6 +69,10 @@ Item {
             root.retractingToHidden = false;
             root.isMorphing = false;
             morphCollapseTimer.stop();
+            root.targetCardX = root.sourcePillLeftInRoot;
+            root.targetCardWidth = root.sourcePillWidth;
+            root.targetCardHeight = root.pillHeight;
+            root.targetCardRadius = root.pillRadius;
             root.containerY = -(root.pillHeight + root.topMargin + 10);
         }
     }
@@ -114,7 +118,12 @@ Item {
         const wasFromHidden = root.openedFromHidden;
         root.openedFromHidden = false;
         if (!wasFromHidden) {
+            root.snapGeometry = false;
             root.isMorphing = true;
+            root.targetCardX = root.sourcePillLeftInRoot;
+            root.targetCardWidth = root.sourcePillWidth;
+            root.targetCardHeight = root.pillHeight;
+            root.targetCardRadius = root.pillRadius;
             morphCollapseTimer.restart();
         } else {
             root.isMorphing = false;
@@ -144,18 +153,52 @@ Item {
             root.previousMode = root.currentMode;
         }
         morphCollapseTimer.stop();
+
         root.updateSourcePill(mode || "dashboard");
-        root.isMorphing = !wasHidden;
-        root.snapGeometry = wasHidden;
-        root.currentMode = mode || "dashboard";
-        root.snapGeometry = false;
+
+        const targetW = root.calculateTargetWidth(mode || "dashboard");
+        const targetH = root.calculateTargetHeight(mode || "dashboard");
+        const centerX = Math.round((root.width - targetW) / 2);
+
         if (wasHidden) {
-            slideDownAnim.from = -(root.targetHeight + root.topMargin + 10);
+            root.snapGeometry = true;
+            root.isMorphing = false;
+            root.targetCardX = centerX;
+            root.targetCardWidth = targetW;
+            root.targetCardHeight = targetH;
+            root.targetCardRadius = root.panelRadius;
+            root.currentMode = mode || "dashboard";
+            slideDownAnim.from = -(targetH + root.topMargin + 10);
             slideDownAnim.to = 0;
             slideDownAnim.start();
+        } else if (root.currentMode !== "collapsed") {
+            root.snapGeometry = false;
+            root.isMorphing = true;
+            root.currentMode = mode || "dashboard";
+            root.targetCardX = centerX;
+            root.targetCardWidth = targetW;
+            root.targetCardHeight = targetH;
+            root.targetCardRadius = root.panelRadius;
         } else {
+            // Step 1: Snap card to exact position of the source pill (with Behaviors disabled)
+            root.snapGeometry = true;
+            root.isMorphing = false;
+            root.targetCardX = root.sourcePillLeftInRoot;
+            root.targetCardWidth = root.sourcePillWidth;
+            root.targetCardHeight = root.pillHeight;
+            root.targetCardRadius = root.pillRadius;
+
+            // Step 2: Set expanded mode and animate smoothly to screen center
+            root.currentMode = mode || "dashboard";
+            root.snapGeometry = false;
+            root.isMorphing = true;
+            root.targetCardX = centerX;
+            root.targetCardWidth = targetW;
+            root.targetCardHeight = targetH;
+            root.targetCardRadius = root.panelRadius;
             root.animateReveal(0);
         }
+
         if (root.currentMode === "dashboard") {
             NetworkService.update();
             BluetoothService.updateStatus();
@@ -465,23 +508,20 @@ Item {
         ]
     }
 
-    readonly property int targetWidth: {
-        if (root.isExpanded || root.retractingToHidden) {
-            if (root.currentMode === "osd") {
-                return Math.min(300, root.width - 32);
-            }
-            if (root.currentMode === "wallpapers") {
-                return Math.min(540, root.width - 32);
-            }
-            return Math.min(420, root.width - 32);
+    function calculateTargetWidth(mode: string): int {
+        if (mode === "osd") {
+            return Math.min(300, root.width - 32);
         }
-        return Math.min(Math.max(pillsRow.implicitWidth, 200), Math.max(200, root.width - 32));
+        if (mode === "wallpapers") {
+            return Math.min(540, root.width - 32);
+        }
+        return Math.min(420, root.width - 32);
     }
 
-    readonly property int targetHeight: {
-        switch (root.currentMode) {
+    function calculateTargetHeight(mode: string): int {
+        switch (mode) {
         case "osd":
-            return osdView.implicitHeight;
+            return osdView.implicitHeight > 0 ? osdView.implicitHeight : 48;
         case "notification":
             return (notificationView.implicitHeight > 0) ? notificationView.implicitHeight : root.pillHeight;
         case "dashboard":
@@ -518,6 +558,9 @@ Item {
         }
     }
 
+    readonly property int targetWidth: calculateTargetWidth(root.currentMode)
+    readonly property int targetHeight: calculateTargetHeight(root.currentMode)
+
     property Item activeSourcePill: null
 
     function sourcePillForMode(mode: string): Item {
@@ -527,7 +570,9 @@ Item {
         case "media":
             return contextPill;
         case "alerts":
+        case "notification":
             return (alertsPill.visible ? alertsPill : statusPill);
+        case "osd":
         case "sound":
         case "mic":
         case "battery":
@@ -552,19 +597,18 @@ Item {
 
     readonly property Item resolvedSourcePill: activeSourcePill ?? timePill
     readonly property real sourcePillLeftInRoot: {
-        if (!resolvedSourcePill)
+        const pill = resolvedSourcePill;
+        if (!pill)
             return Math.round((root.width - root.targetWidth) / 2);
         const rowLeft = Math.round((root.width - pillsRow.implicitWidth) / 2);
-        return rowLeft + resolvedSourcePill.x;
+        return rowLeft + pill.x;
     }
     readonly property real sourcePillWidth: resolvedSourcePill ? resolvedSourcePill.width : root.pillHeight
 
-    readonly property int targetCardWidth: (root.isExpanded || root.openedFromHidden) ? root.targetWidth : Math.round(sourcePillWidth)
-    readonly property int targetCardHeight: (root.isExpanded || root.openedFromHidden) ? root.targetHeight : root.pillHeight
-    readonly property real targetCardX: (root.isExpanded || root.openedFromHidden)
-        ? Math.round((root.width - root.targetWidth) / 2)
-        : sourcePillLeftInRoot
-    readonly property real targetCardRadius: root.isExpanded ? root.panelRadius : root.pillRadius
+    property real targetCardWidth: Math.round(sourcePillWidth)
+    property real targetCardHeight: root.pillHeight
+    property real targetCardX: sourcePillLeftInRoot
+    property real targetCardRadius: root.pillRadius
     readonly property real targetCardOpacity: (root.isExpanded || root.retractingToHidden || root.isMorphing) ? 1.0 : 0.0
 
     onCurrentModeChanged: {
@@ -1086,78 +1130,13 @@ Item {
             }
         }
 
-        // Preview header showing the source pill's visual label during transit
-        Item {
-            id: pillMorphPreview
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            height: root.pillHeight
-            visible: opacity > 0.001
-            opacity: root.targetCardHeight <= (root.pillHeight + 50) ? 1.0 : 0.0
-
-            Behavior on opacity {
-                enabled: Motion.enabled
-                NumberAnimation {
-                    duration: Motion.fadeOutDuration
-                    easing.type: Easing.OutCubic
-                }
-            }
-
-            Text {
-                anchors.centerIn: parent
-                visible: root.activeSourcePill === timePill || root.currentMode === "dashboard" || root.currentMode === "calendar"
-                text: root.formattedTime
-                font.family: Config.theme.monoFont
-                font.pixelSize: Styling.fontSize(-1)
-                font.bold: true
-                color: Colors.overBackground
-                renderType: Text.NativeRendering
-            }
-
-            Text {
-                anchors.centerIn: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                visible: root.activeSourcePill === contextPill || root.currentMode === "media" || root.currentMode === "apps"
-                text: root.contextLabel
-                font.family: Config.theme.font
-                font.pixelSize: Styling.fontSize(-1)
-                font.bold: true
-                elide: Text.ElideRight
-                color: Colors.overBackground
-                renderType: Text.NativeRendering
-            }
-
-            RowLayout {
-                anchors.centerIn: parent
-                spacing: 6
-                visible: root.activeSourcePill === statusPill || root.currentMode === "sound" || root.currentMode === "battery" || root.currentMode === "stats" || root.currentMode === "osd"
-
-                Text {
-                    text: root.batteryIcon
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: 16
-                    color: root.batteryColor
-                    renderType: Text.NativeRendering
-                }
-                Text {
-                    text: root.audioMuted ? "volume_off" : "volume_up"
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: 16
-                    color: root.audioMuted ? Colors.error : Colors.overBackground
-                    renderType: Text.NativeRendering
-                }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                FocusGrabManager.clearTopGrab();
+                Visibilities.closeActiveBarPopup();
             }
         }
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    FocusGrabManager.clearTopGrab();
-                    Visibilities.closeActiveBarPopup();
-                }
-            }
 
             Item {
                 id: pageLayer

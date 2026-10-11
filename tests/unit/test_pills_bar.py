@@ -201,17 +201,19 @@ class TestPillsBarLayout(unittest.TestCase):
         self.assertIn("x: root.targetCardX", self.pills_content)
         self.assertIn("width: root.targetCardWidth", self.pills_content)
         self.assertIn("height: root.targetCardHeight", self.pills_content)
+        self.assertIn("radius: root.targetCardRadius", self.pills_content)
         self.assertIn("Behavior on x", self.pills_content)
         self.assertIn("root.isMorphing", self.pills_content)
-        self.assertIn("pillMorphPreview", self.pills_content)
         # Source pill resolution
         self.assertIn("sourcePillForMode(mode: string)", self.pills_content)
         self.assertIn("updateSourcePill(mode: string)", self.pills_content)
         self.assertIn("activeSourcePill", self.pills_content)
         self.assertIn("sourcePillLeftInRoot", self.pills_content)
-        # Dashboard resolves to timePill
+        # Dashboard resolves to timePill, OSD resolves to statusPill
         self.assertIn("case \"dashboard\":", self.pills_content)
         self.assertIn("return timePill;", self.pills_content)
+        self.assertIn("case \"osd\":", self.pills_content)
+        self.assertIn("return statusPill;", self.pills_content)
 
 
 if __name__ == "__main__":
