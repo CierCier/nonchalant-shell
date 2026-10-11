@@ -33,7 +33,15 @@ def extract(video_id):
                "--ignore-no-formats-error", "--no-warnings", "--quiet",
                "--socket-timeout", "8", "--retries", "1", "--extractor-retries", "1",
                "--dump-single-json", "--", f"https://www.youtube.com/watch?v={video_id}"]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+
+    def _set_pdeathsig():
+        try:
+            import ctypes
+            ctypes.CDLL(None).prctl(1, signal.SIGTERM)
+        except Exception:
+            pass
+
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True, preexec_fn=_set_pdeathsig)
     previous_handler = signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:
         output, _ = process.communicate(timeout=30)
