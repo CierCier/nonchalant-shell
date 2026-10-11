@@ -180,6 +180,39 @@ class TestPillsBarLayout(unittest.TestCase):
         self.assertIn('label: "Pills"', self.shell_panel_content)
         self.assertIn('value: "pills"', self.shell_panel_content)
 
+    def test_hover_to_reveal_hitbox_bounds(self):
+        """Hover reveal hitbox and hoverZone must start at screen edge (y = 0) to capture top bezel hover."""
+        self.assertIn("id: activeBarHitbox", self.pills_content)
+        self.assertIn("id: hoverZone", self.pills_content)
+        self.assertIn("id: revealHoverHandler", self.pills_content)
+        # Hitbox and hoverZone must start at top edge y: 0, not y: topMargin
+        hitbox_section = self.pills_content.split("id: activeBarHitbox")[1].split("}")[0]
+        self.assertIn("y: 0", hitbox_section)
+        hover_section = self.pills_content.split("id: hoverZone")[1].split("HoverHandler")[0]
+        self.assertIn("y: 0", hover_section)
+        self.assertIn("Math.max(16, root.triggerHeight + root.topMargin)", hover_section)
+
+    def test_time_pill_morphing_to_center(self):
+        """Dashboard originates from timePill, glides to screen center, and does not stretch the other pills."""
+        # Collapsed layer is a fixed row of pills that does NOT stretch
+        self.assertIn("width: pillsRow.implicitWidth", self.pills_content)
+        self.assertIn("height: root.pillHeight", self.pills_content)
+        # Expanded card has dynamic x, width, height, and radius animating to screen center
+        self.assertIn("x: root.targetCardX", self.pills_content)
+        self.assertIn("width: root.targetCardWidth", self.pills_content)
+        self.assertIn("height: root.targetCardHeight", self.pills_content)
+        self.assertIn("radius: root.targetCardRadius", self.pills_content)
+        self.assertIn("Behavior on x", self.pills_content)
+        self.assertIn("Behavior on radius", self.pills_content)
+        # Source pill resolution
+        self.assertIn("sourcePillForMode(mode: string)", self.pills_content)
+        self.assertIn("updateSourcePill(mode: string)", self.pills_content)
+        self.assertIn("activeSourcePill", self.pills_content)
+        self.assertIn("sourcePillLeftInRoot", self.pills_content)
+        # Dashboard resolves to timePill
+        self.assertIn("case \"dashboard\":", self.pills_content)
+        self.assertIn("return timePill;", self.pills_content)
+
 
 if __name__ == "__main__":
     unittest.main()

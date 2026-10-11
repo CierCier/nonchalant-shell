@@ -123,6 +123,7 @@ Item {
         if (root.currentMode !== mode) {
             root.previousMode = root.currentMode;
         }
+        root.updateSourcePill(mode || "dashboard");
         root.snapGeometry = wasHidden;
         root.currentMode = mode || "dashboard";
         root.snapGeometry = false;
@@ -495,7 +496,59 @@ Item {
         }
     }
 
+    property Item activeSourcePill: null
+
+    function sourcePillForMode(mode: string): Item {
+        switch (mode) {
+        case "apps":
+        case "projects":
+        case "media":
+            return contextPill;
+        case "alerts":
+            return (alertsPill.visible ? alertsPill : statusPill);
+        case "sound":
+        case "mic":
+        case "battery":
+        case "wifi":
+        case "bluetooth":
+        case "stats":
+            return statusPill;
+        case "calendar":
+        case "dashboard":
+        case "power":
+        case "weather":
+        case "wallpapers":
+        case "time":
+        default:
+            return timePill;
+        }
+    }
+
+    function updateSourcePill(mode: string) {
+        activeSourcePill = sourcePillForMode(mode);
+    }
+
+    readonly property Item resolvedSourcePill: activeSourcePill ?? timePill
+    readonly property real sourcePillLeftInRoot: {
+        if (!resolvedSourcePill)
+            return Math.round((root.width - root.targetWidth) / 2);
+        const rowLeft = Math.round((root.width - pillsRow.implicitWidth) / 2);
+        return rowLeft + resolvedSourcePill.x;
+    }
+    readonly property real sourcePillWidth: resolvedSourcePill ? resolvedSourcePill.width : root.pillHeight
+
+    readonly property int targetCardWidth: root.isExpanded ? root.targetWidth : Math.round(sourcePillWidth)
+    readonly property int targetCardHeight: root.isExpanded ? root.targetHeight : root.pillHeight
+    readonly property real targetCardX: root.isExpanded
+        ? Math.round((root.width - root.targetWidth) / 2)
+        : sourcePillLeftInRoot
+    readonly property real targetCardRadius: root.isExpanded ? root.panelRadius : root.pillRadius
+    readonly property real targetCardOpacity: root.isExpanded ? root.contentReveal : 0.0
+
     onCurrentModeChanged: {
+        if (currentMode !== "collapsed" && !root.retractingToHidden) {
+            root.updateSourcePill(currentMode);
+        }
         FocusGrabManager.clearTopGrab();
         Visibilities.closeActiveBarPopup();
         GlobalStates.islandOpen = (currentMode !== "collapsed" && currentMode !== "notification" && currentMode !== "osd" && !root.retractingToHidden);
@@ -684,50 +737,27 @@ Item {
     Item {
         id: activeBarHitbox
         anchors.horizontalCenter: parent.horizontalCenter
-        y: root.topMargin + Math.max(0, root.containerY)
-        width: pillsContainer.width
-        height: root.isExpanded ? pillsContainer.height : (root.hitboxExpanded ? pillsContainer.height : root.triggerHeight)
+        y: 0
+        width: root.isExpanded
+            ? Math.max(expandedCard.width, pillsRow.implicitWidth + 16)
+            : Math.max(200, pillsRow.implicitWidth + 16)
+        height: root.isExpanded
+            ? (root.topMargin + expandedCard.height + 8)
+            : (root.hitboxExpanded ? (root.topMargin + root.pillHeight + 8) : Math.max(16, root.triggerHeight + root.topMargin))
     }
 
-    // ═════════════════════════════════════════════════════════════════
-    // FLOATING MASTER CONTAINER (Fluid Morphing Geometry)
-    // ═════════════════════════════════════════════════════════════════
+    // ═════════════════════════════════════════════════════════════
+    // COLLAPSED BAR STATE: SEPARATE FLOATING PILLS
+    // ═════════════════════════════════════════════════════════════
     Item {
-        id: pillsContainer
+        id: collapsedPillsLayer
         anchors.horizontalCenter: parent.horizontalCenter
         y: root.topMargin + root.containerY
-        width: root.targetWidth
-        height: root.targetHeight
-        visible: root.revealProgress > 0.001
-
-        Behavior on width {
-            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
-            NumberAnimation {
-                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
-                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
-                easing.overshoot: Motion.overshoot
-            }
-        }
-
-        Behavior on height {
-            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
-            NumberAnimation {
-                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
-                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
-                easing.overshoot: Motion.overshoot
-            }
-        }
-
-        // ═════════════════════════════════════════════════════════════
-        // COLLAPSED BAR STATE: SEPARATE FLOATING PILLS
-        // ═════════════════════════════════════════════════════════════
-        Item {
-            id: collapsedPillsLayer
-            anchors.centerIn: parent
-            width: pillsRow.implicitWidth
-            height: root.pillHeight
-            visible: opacity > 0.001
-            opacity: root.isExpanded ? 0.0 : root.contentReveal
+        width: pillsRow.implicitWidth
+        height: root.pillHeight
+        visible: opacity > 0.001 && root.revealProgress > 0.001
+        enabled: !root.isExpanded
+        opacity: root.isExpanded ? 0.0 : root.contentReveal
 
             Behavior on opacity {
                 enabled: Motion.enabled
@@ -988,28 +1018,68 @@ Item {
             }
         }
 
-        // ═════════════════════════════════════════════════════════════
-        // EXPANDED STATE: UNIFIED FLOATING CARD
-        // ═════════════════════════════════════════════════════════════
-        StyledRect {
-            id: expandedCard
-            anchors.fill: parent
-            variant: "pane"
-            radius: root.panelRadius
-            enableBorder: true
-            enableShadow: true
-            backgroundOpacity: 1.0
-            clip: true
-            visible: opacity > 0.001
-            opacity: root.isExpanded ? root.contentReveal : 0.0
+    // ═════════════════════════════════════════════════════════════
+    // EXPANDED STATE: UNIFIED FLOATING CARD
+    // ═════════════════════════════════════════════════════════════
+    StyledRect {
+        id: expandedCard
+        x: root.targetCardX
+        y: root.topMargin + root.containerY
+        width: root.targetCardWidth
+        height: root.targetCardHeight
+        variant: "pane"
+        radius: root.targetCardRadius
+        enableBorder: true
+        enableShadow: true
+        backgroundOpacity: 1.0
+        clip: true
+        visible: opacity > 0.001 && root.revealProgress > 0.001
+        opacity: root.targetCardOpacity
+        z: 10
 
-            Behavior on opacity {
-                enabled: Motion.enabled
-                NumberAnimation {
-                    duration: root.isExpanded ? Motion.fadeInDuration : Motion.fadeOutDuration
-                    easing.type: Easing.OutCubic
-                }
+        Behavior on x {
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
+            NumberAnimation {
+                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                easing.overshoot: Motion.overshoot
             }
+        }
+
+        Behavior on width {
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
+            NumberAnimation {
+                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                easing.overshoot: Motion.overshoot
+            }
+        }
+
+        Behavior on height {
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && !root.snapGeometry
+            NumberAnimation {
+                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                easing.overshoot: Motion.overshoot
+            }
+        }
+
+        Behavior on radius {
+            enabled: Motion.enabled
+            NumberAnimation {
+                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                easing.overshoot: Motion.overshoot
+            }
+        }
+
+        Behavior on opacity {
+            enabled: Motion.enabled
+            NumberAnimation {
+                duration: root.isExpanded ? Motion.fadeInDuration : Motion.fadeOutDuration
+                easing.type: Easing.OutCubic
+            }
+        }
 
             MouseArea {
                 anchors.fill: parent
@@ -1256,7 +1326,6 @@ Item {
                 }
             }
         }
-    }
 
     // Single hover zone for the autohide reveal
     Item {
@@ -1264,8 +1333,10 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         y: 0
         z: 1000
-        width: Math.max(200, pillsContainer.width)
-        height: Math.max(root.triggerHeight, pillsContainer.height + root.topMargin)
+        width: Math.max(200, pillsRow.implicitWidth + 16)
+        height: root.hitboxExpanded
+            ? (root.topMargin + root.pillHeight + 12)
+            : Math.max(16, root.triggerHeight + root.topMargin)
 
         HoverHandler {
             id: revealHoverHandler
