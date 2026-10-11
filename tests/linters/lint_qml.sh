@@ -27,6 +27,12 @@ CORE_FILES=(
     "modules/shell/ReservationWindows.qml"
     "modules/shell/UnifiedShellPanel.qml"
     "modules/widgets/dashboard/controls/ShellPanel.qml"
+    "modules/services/LyricsService.qml"
+    "modules/services/SystemResources.qml"
+    "modules/components/LyricsView.qml"
+    "modules/widgets/dashboard/controls/SettingsTab.qml"
+    "modules/widgets/dashboard/controls/SettingsIndex.qml"
+    "modules/widgets/dashboard/controls/CustomColorPicker.qml"
 )
 
 # Also include modular bar files if they exist

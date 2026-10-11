@@ -17,6 +17,7 @@ release process. The fork keeps a lean runtime focus:
 - one unified bar
 - floating run menu
 - lockscreen
+- searchable settings and synchronized lyrics
 - reactive JSON configuration
 
 Multi-monitor support uses Quickshell `Variants` on `Quickshell.screens`.
@@ -28,7 +29,9 @@ Multi-monitor support uses Quickshell `Variants` on `Quickshell.screens`.
 - Unified bar with workspaces/taskbar, clock, system status, and systray
 - Floating run menu and power menu
 - Wallpaper picker and secure `WlSessionLock` session lock
-- Isolated `nonchalant` config, state, cache, data, and IPC paths
+- Searchable settings with section history, previews, and the existing configuration domains
+- Synchronized lyrics in the media players and lockscreen
+- Separate configuration, per-shell state, cache, data, and IPC paths
 
 ## Showcase
 
@@ -75,6 +78,24 @@ and toggles it closed when invoked again. This can be bound from Niri with:
 Mod+Shift+W hotkey-overlay-title="Open Wallpapers" { spawn "nonchalant" "run" "wallpapers"; }
 ```
 
+### Settings and lyrics
+
+`nonchalant run settings` opens the redesigned settings window. Search settings,
+move between sections with back and forward history, and adjust colors with the
+built-in color picker. Existing Network, Bluetooth, Mixer, AI, theme, and system
+controls use the same configuration store.
+
+Lyrics follow the selected MPRIS player. Timed lines follow playback and can be
+clicked to seek; plain lyrics scroll manually. Shell settings provide separate
+bar and lockscreen switches. When a lyrics view is visible, track title, artist,
+album, and duration are sent to [LRCLIB](https://lrclib.net). Results are cached
+under `$XDG_STATE_HOME/nonchalant/lyrics`. Hidden views do not start new lookups
+or retries. Changing tracks or closing the last active lyrics view cancels the
+old lookup and discards its output.
+Retries are scheduled by the active lyrics service, not by the Python helper.
+The lyrics helper requires Python 3.
+
+
 ## Run the development tree
 
 Install Quickshell and the runtime tools needed by the shell. Install fonts once,
@@ -91,6 +112,9 @@ Or use the CLI wrapper:
 ./cli.sh
 ```
 
+Run the relevant validation suite with `python3 tests/run_tests.py --all`.
+Runtime checks use isolated Quickshell configuration and state.
+
 The installer and Nix package are still inherited scaffolding and may need
 adjustment for this fork.
 
@@ -99,6 +123,12 @@ adjustment for this fork.
 Nonchalant Shell is derived from Ambxst by Axenide. Full copyright and
 contributor history from that lineage is preserved in this repository’s Git
 history.
+
+The settings presentation and lyrics port incorporate
+work from [Impasto](https://github.com/andreumassanet/impasto) by Andreu Massanet,
+based on revision `6d759aa3fe16e3b40641beeb9b24e3c4afcfeefe`. That upstream is
+GPLv3-licensed; its retained source notices and
+[license](./docs/licenses/impasto.txt) apply to the incorporated work.
 
 This project is licensed under the GNU Affero General Public License v3.0 or
 later. See [LICENSE](./LICENSE).

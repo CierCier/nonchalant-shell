@@ -193,6 +193,7 @@ Singleton {
     function toggleSettings(screenName) {
         const willOpen = !GlobalStates.settingsWindowVisible;
         if (willOpen) {
+            FocusGrabManager.clearTopGrab();
             const targetMonitor = screenName
                 ? NiriService.monitorFor(screenName)
                 : NiriService.focusedMonitor;

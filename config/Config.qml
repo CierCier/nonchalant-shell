@@ -488,6 +488,7 @@ Singleton {
             property string style: "default"
             property list<string> screenList: []
             property bool enableFirefoxPlayer: false
+            property bool lyricsEnabled: true
             property bool use12hFormat: false
             property bool pinned: false
         }
@@ -600,6 +601,7 @@ Singleton {
 
         adapter: JsonAdapter {
             property string position: "bottom"
+            property bool lyricsEnabled: true
         }
     }
 
