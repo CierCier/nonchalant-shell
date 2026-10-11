@@ -129,7 +129,8 @@ Singleton {
     }
 
     function isIslandStyle(): bool {
-        return (Config.bar?.style ?? "default") === "island";
+        const s = Config.bar?.style ?? "default";
+        return s === "island" || s === "pills";
     }
 
     // Module / IPC names -> island modes. "launcher" is resolved separately
@@ -340,7 +341,7 @@ Singleton {
                 screenProps[moduleNames[i]] = false;
             }
         }
-        if (collapseIslands && (Config.bar?.style ?? "default") === "island") {
+        if (collapseIslands && ((Config.bar?.style ?? "default") === "island" || (Config.bar?.style ?? "default") === "pills")) {
             for (const screenName in islands) {
                 const island = islands[screenName];
                 if (island && island.isExpanded) {
@@ -383,8 +384,8 @@ Singleton {
         }
 
         function onFullscreenOutputsChanged() {
-            // In island style, windows naturally occupy full output without top reservation.
-            if ((Config.bar?.style ?? "default") === "island")
+            // In island and pills style, windows naturally occupy full output without top reservation.
+            if ((Config.bar?.style ?? "default") === "island" || (Config.bar?.style ?? "default") === "pills")
                 return;
 
             // A fullscreen window covers the Overlay-layer panel — dismiss shell

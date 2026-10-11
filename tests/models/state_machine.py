@@ -9,6 +9,7 @@ from typing import Optional, List, Callable
 class BarStyle(str, Enum):
     DEFAULT = "default"
     ISLAND = "island"
+    PILLS = "pills"
 
 class IslandState(str, Enum):
     RESTING_VISIBLE = "resting_visible"

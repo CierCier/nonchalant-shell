@@ -368,10 +368,12 @@ print(json.dumps({'id': video_id, 'duration': 444 if video_id == 'slowtrack01' e
             canceled_pid = home / ".local/state/slow-extractor.pid"
             self.assertTrue(canceled_pid.exists(), "The slow extractor must have started before cancellation")
             pid = int(canceled_pid.read_text())
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                pass
+            for _ in range(40):
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.05)
             else:
                 status = Path(f"/proc/{pid}/status").read_text().splitlines()[:3]
                 os.kill(pid, 15)

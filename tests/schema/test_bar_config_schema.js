@@ -77,6 +77,11 @@ test("F1-VALIDATOR-2: Validator accepts 'island' as a valid style", () => {
     assert.strictEqual(validated, "island");
 });
 
+test("F1-VALIDATOR-2B: Validator accepts 'pills' as a valid style", () => {
+    const validated = validator.validate("pills", "default", "style");
+    assert.strictEqual(validated, "pills");
+});
+
 test("F1-VALIDATOR-3: Validator rejects invalid style strings and falls back to default", () => {
     const invalidValues = ["dock", "floating", "dynamic-island", "topbar", "", "ISLAND", "Default"];
     for (const val of invalidValues) {
@@ -105,6 +110,24 @@ test("F1-FULLOBJ-1: Valid full bar config preserves 'island' style", () => {
     };
     const validated = validator.validate(input, barDefaults.data, "bar");
     assert.strictEqual(validated.style, "island");
+    assert.strictEqual(validated.position, "top");
+    assert.deepStrictEqual(validated.screenList, ["DP-1"]);
+    assert.strictEqual(validated.enableFirefoxPlayer, true);
+    assert.strictEqual(validated.use12hFormat, true);
+    assert.strictEqual(validated.pinned, true);
+});
+
+test("F1-FULLOBJ-1B: Valid full bar config preserves 'pills' style", () => {
+    const input = {
+        position: "top",
+        style: "pills",
+        screenList: ["DP-1"],
+        enableFirefoxPlayer: true,
+        use12hFormat: true,
+        pinned: true
+    };
+    const validated = validator.validate(input, barDefaults.data, "bar");
+    assert.strictEqual(validated.style, "pills");
     assert.strictEqual(validated.position, "top");
     assert.deepStrictEqual(validated.screenList, ["DP-1"]);
     assert.strictEqual(validated.enableFirefoxPlayer, true);

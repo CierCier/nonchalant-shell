@@ -590,6 +590,11 @@ Item {
                                     label: "Island",
                                     value: "island",
                                     icon: Icons.circle
+                                },
+                                {
+                                    label: "Pills",
+                                    value: "pills",
+                                    icon: Icons.dotsThree
                                 }
                             ]
                             value: Config.bar?.style ?? "default"
@@ -665,8 +670,8 @@ Item {
                         }
 
                         ToggleRow {
-                            visible: (Config.bar?.style ?? "default") === "island"
-                            label: "Pin Dynamic Island"
+                            visible: (Config.bar?.style === "island" || Config.bar?.style === "pills")
+                            label: (Config.bar?.style === "pills") ? "Pin Floating Bar" : "Pin Dynamic Island"
                             checked: Config.bar.pinned ?? false
                             onToggled: value => {
                                 if (value !== Config.bar.pinned) {
