@@ -75,6 +75,7 @@ Item {
         font.weight: Font.DemiBold
         wrapMode: Text.NoWrap
         elide: Text.ElideRight
+        horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
     }
 
