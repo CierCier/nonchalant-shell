@@ -188,6 +188,7 @@ def main():
         run_unittest_suite("Tier 4: Real-World Scenarios", "tests.e2e.test_tier4_lifecycle", collector, args.verbose)
         run_unittest_suite("Tier 4: Settings and Lyrics Runtime", "tests.e2e.test_settings_lyrics_runtime", collector, args.verbose)
         run_unittest_suite("Tier 4: MPRIS Duration Runtime", "tests.e2e.test_mpris_runtime", collector, args.verbose)
+        run_unittest_suite("Tier 4: Bar Context Text Runtime", "tests.e2e.test_bar_text_runtime", collector, args.verbose)
 
     if args.json:
         report = {

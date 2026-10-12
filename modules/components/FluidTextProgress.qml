@@ -22,16 +22,10 @@ Item {
 
     readonly property bool showFluidBar: root.isPlaying && root.progress > 0.0
 
-    TextMetrics {
-        id: textMetrics
-        font.family: root.fontFamily
-        font.pixelSize: root.pixelSize
-        font.bold: root.bold
-        text: root.text
-    }
-
-    implicitWidth: Math.ceil(textMetrics.advanceWidth)
-    implicitHeight: Math.max(Math.ceil(textMetrics.height) + (root.showFluidBar ? 6 : 0), 20)
+    // Use the rendered label's hinted metrics so natural-width labels never elide.
+    implicitWidth: Math.ceil(baseText.implicitWidth)
+    implicitHeight: Math.max(Math.ceil(baseText.implicitHeight)
+        + (root.showFluidBar ? wavyCanvas.height + wavyCanvas.anchors.bottomMargin + baseText.anchors.bottomMargin : 0), 20)
 
     property real phase: 0.0
 
