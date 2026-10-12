@@ -164,8 +164,8 @@ class TestPillsBarLayout(unittest.TestCase):
     def test_tactile_feedback_on_interactive_elements(self):
         """Interactive pills and buttons implement cohesive tactile scaling with PressBehavior."""
         self.assertIn("PressBehavior on scale", self.pills_content)
-        self.assertIn("scale: contextMouse.pressed ? 0.94 : 1.0", self.pills_content)
-        self.assertIn("scale: timeMouse.pressed ? 0.94 : 1.0", self.pills_content)
+        self.assertIn("pressed: contextPill.isPressed", self.pills_content)
+        self.assertIn("pressed: timePill.isPressed", self.pills_content)
 
     def test_visibilities_and_ipc_integration(self):
         """Visibilities recognizes pills as an island-like style for seamless IPC."""

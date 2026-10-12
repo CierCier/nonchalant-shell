@@ -12,6 +12,7 @@ Item {
     property int pixelSize: Styling.fontSize(-1)
     property bool bold: true
     property int elide: Text.ElideRight
+    property int horizontalAlignment: root.isPlaying ? Text.AlignLeft : Text.AlignHCenter
     property int verticalAlignment: Text.AlignVCenter
     property real progress: 0.0
     property bool isPlaying: false
@@ -21,8 +22,16 @@ Item {
 
     readonly property bool showFluidBar: root.isPlaying && root.progress > 0.0
 
-    implicitWidth: Math.min(baseText.implicitWidth, 200)
-    implicitHeight: Math.max(baseText.implicitHeight + (root.showFluidBar ? 6 : 0), 20)
+    TextMetrics {
+        id: textMetrics
+        font.family: root.fontFamily
+        font.pixelSize: root.pixelSize
+        font.bold: root.bold
+        text: root.text
+    }
+
+    implicitWidth: Math.ceil(textMetrics.advanceWidth)
+    implicitHeight: Math.max(Math.ceil(textMetrics.height) + (root.showFluidBar ? 6 : 0), 20)
 
     property real phase: 0.0
 
@@ -43,13 +52,14 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: root.showFluidBar ? wavyCanvas.top : parent.bottom
-        anchors.bottomMargin: root.showFluidBar ? 1 : 0
+        anchors.bottomMargin: root.showFluidBar ? 2 : 0
         text: root.text
         font.family: root.fontFamily
         font.pixelSize: root.pixelSize
         font.bold: root.bold
         color: (root.isPlaying && root.progress <= 0.0) ? root.fillColor : root.baseColor
         elide: root.elide
+        horizontalAlignment: root.horizontalAlignment
         verticalAlignment: root.verticalAlignment
         renderType: Text.NativeRendering
         font.hintingPreference: Font.PreferFullHinting
@@ -75,6 +85,7 @@ Item {
     Canvas {
         id: wavyCanvas
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: 2
         anchors.left: parent.left
         anchors.right: parent.right
         height: 5

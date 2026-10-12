@@ -15,6 +15,7 @@ RowLayout {
     spacing: 2
 
     readonly property string iconFont: "Material Symbols Rounded"
+    readonly property bool canInteract: root.bar && !root.bar.isExpanded && !root.bar.isMorphing
 
     // ═══════════════════════════════════════════════════════════════
     // 1. BRIGHTNESS DYNAMIC ICON (7 Granular States)
@@ -42,8 +43,11 @@ RowLayout {
             return "light_mode";
         }
 
+        readonly property bool isHovered: brightMouse.containsMouse && root.canInteract
+        readonly property bool isPressed: brightMouse.pressed && isHovered
+
         readonly property color iconColor: {
-            if (brightMouse.containsMouse) return Colors.primary;
+            if (isHovered) return Colors.primary;
             if (brightnessVal <= 0.15) return Colors.overSurfaceVariant;
             return Colors.overBackground;
         }
@@ -51,10 +55,10 @@ RowLayout {
         StyledRect {
             anchors.fill: parent
             radius: 13
-            variant: brightMouse.containsMouse ? "focus" : "transparent"
-            scale: brightMouse.pressed ? 0.92 : 1.0
+            variant: brightBtn.isHovered ? "focus" : "transparent"
+            scale: brightBtn.isPressed ? 0.92 : 1.0
             PressBehavior on scale {
-                pressed: brightMouse.pressed
+                pressed: brightBtn.isPressed
             }
 
             DynamicSunIcon {
@@ -94,7 +98,7 @@ RowLayout {
         }
 
         StyledToolTip {
-            show: brightMouse.containsMouse
+            show: brightBtn.isHovered
             tooltipText: "Brightness " + Math.round(brightBtn.brightnessVal * 100) + "%"
         }
     }
@@ -120,9 +124,12 @@ RowLayout {
             return "volume_up";
         }
 
+        readonly property bool isHovered: volMouse.containsMouse && root.canInteract
+        readonly property bool isPressed: volMouse.pressed && isHovered
+
         readonly property color iconColor: {
             if (isMuted) return Colors.error;
-            if (volMouse.containsMouse) return Colors.primary;
+            if (isHovered) return Colors.primary;
             if (volumeVal < 0.01) return Colors.overSurfaceVariant;
             return Colors.overBackground;
         }
@@ -130,10 +137,10 @@ RowLayout {
         StyledRect {
             anchors.fill: parent
             radius: 13
-            variant: volMouse.containsMouse ? "focus" : "transparent"
-            scale: volMouse.pressed ? 0.92 : 1.0
+            variant: volBtn.isHovered ? "focus" : "transparent"
+            scale: volBtn.isPressed ? 0.92 : 1.0
             PressBehavior on scale {
-                pressed: volMouse.pressed
+                pressed: volBtn.isPressed
             }
 
             DynamicVolumeIcon {
@@ -179,7 +186,7 @@ RowLayout {
         }
 
         StyledToolTip {
-            show: volMouse.containsMouse
+            show: volBtn.isHovered
             tooltipText: (volBtn.isMuted ? "Muted " : "Volume ") + Math.round(volBtn.volumeVal * 100) + "%"
         }
     }
@@ -197,20 +204,23 @@ RowLayout {
         readonly property int percent: Battery.percent
         readonly property bool charging: Battery.charging
 
+        readonly property bool isHovered: batMouse.containsMouse && root.canInteract
+        readonly property bool isPressed: batMouse.pressed && isHovered
+
         readonly property color iconColor: {
             if (percent < 20 && !charging) return Colors.error;
             if (charging) return Colors.primary;
-            if (batMouse.containsMouse) return Colors.primary;
+            if (isHovered) return Colors.primary;
             return Colors.overBackground;
         }
 
         StyledRect {
             anchors.fill: parent
             radius: 13
-            variant: batMouse.containsMouse ? "focus" : "transparent"
-            scale: batMouse.pressed ? 0.92 : 1.0
+            variant: batBtn.isHovered ? "focus" : "transparent"
+            scale: batBtn.isPressed ? 0.92 : 1.0
             PressBehavior on scale {
-                pressed: batMouse.pressed
+                pressed: batBtn.isPressed
             }
 
             DynamicBatteryIcon {
@@ -232,7 +242,7 @@ RowLayout {
         }
 
         StyledToolTip {
-            show: batMouse.containsMouse
+            show: batBtn.isHovered
             tooltipText: `${batBtn.percent}%${batBtn.charging ? " (Charging)" : ""}`
         }
     }

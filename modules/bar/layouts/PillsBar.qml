@@ -1,5 +1,3 @@
-pragma ComponentBehavior: Bound
-
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -59,6 +57,15 @@ Item {
         }
     }
 
+    Timer {
+        id: morphExpandTimer
+        interval: Motion.expandDuration + 40
+        repeat: false
+        onTriggered: {
+            root.isMorphing = false;
+        }
+    }
+
     function finishRetraction() {
         if (root.retractingToHidden) {
             slideUpAnim.stop();
@@ -69,6 +76,7 @@ Item {
             root.retractingToHidden = false;
             root.isMorphing = false;
             morphCollapseTimer.stop();
+            morphExpandTimer.stop();
             root.targetCardX = root.sourcePillLeftInRoot;
             root.targetCardWidth = root.sourcePillWidth;
             root.targetCardHeight = root.pillHeight;
@@ -124,9 +132,11 @@ Item {
             root.targetCardWidth = root.sourcePillWidth;
             root.targetCardHeight = root.pillHeight;
             root.targetCardRadius = root.pillRadius;
+            morphExpandTimer.stop();
             morphCollapseTimer.restart();
         } else {
             root.isMorphing = false;
+            morphExpandTimer.stop();
         }
         root.currentMode = "collapsed";
         root.animateReveal(root.shouldBeRevealed ? 0 : -(root.pillHeight + root.topMargin + 10));
@@ -153,6 +163,7 @@ Item {
             root.previousMode = root.currentMode;
         }
         morphCollapseTimer.stop();
+        morphExpandTimer.stop();
 
         root.updateSourcePill(mode || "dashboard");
 
@@ -174,6 +185,7 @@ Item {
         } else if (root.currentMode !== "collapsed") {
             root.snapGeometry = false;
             root.isMorphing = true;
+            morphExpandTimer.restart();
             root.currentMode = mode || "dashboard";
             root.targetCardX = centerX;
             root.targetCardWidth = targetW;
@@ -188,15 +200,18 @@ Item {
             root.targetCardHeight = root.pillHeight;
             root.targetCardRadius = root.pillRadius;
 
-            // Step 2: Set expanded mode and animate smoothly to screen center
+            // Step 2: Set expanded mode and animate smoothly to screen center in next frame
             root.currentMode = mode || "dashboard";
-            root.snapGeometry = false;
-            root.isMorphing = true;
-            root.targetCardX = centerX;
-            root.targetCardWidth = targetW;
-            root.targetCardHeight = targetH;
-            root.targetCardRadius = root.panelRadius;
-            root.animateReveal(0);
+            Qt.callLater(() => {
+                root.snapGeometry = false;
+                root.isMorphing = true;
+                morphExpandTimer.restart();
+                root.targetCardX = centerX;
+                root.targetCardWidth = targetW;
+                root.targetCardHeight = targetH;
+                root.targetCardRadius = root.panelRadius;
+                root.animateReveal(0);
+            });
         }
 
         if (root.currentMode === "dashboard") {
@@ -277,7 +292,7 @@ Item {
         triggeredOnStart: true
         onTriggered: {
             const now = new Date();
-            const format = Config.bar?.use12hFormat ? "hh:mm ap" : "HH:mm";
+            const format = (Config.bar && Config.bar.use12hFormat) ? "hh:mm ap" : "HH:mm";
             root.formattedTime = Qt.formatTime(now, format);
             root.formattedDate = Qt.formatDate(now, "ddd d MMM");
         }
@@ -295,8 +310,8 @@ Item {
         return Battery.statusColor();
     }
 
-    readonly property bool audioMuted: Audio.sink?.audio?.muted ?? false
-    readonly property real audioVolume: Audio.sink?.audio?.volume ?? 0.0
+    readonly property bool audioMuted: (Audio.sink && Audio.sink.audio) ? Audio.sink.audio.muted : false
+    readonly property real audioVolume: (Audio.sink && Audio.sink.audio) ? Audio.sink.audio.volume : 0.0
 
     readonly property int alertsCount: {
         if (Notifications.silent) return 0;
@@ -305,7 +320,7 @@ Item {
         if (!list) return 0;
         for (let i = 0; i < list.length; i++) {
             const grp = Notifications.groupsByAppName[list[i]];
-            if (grp?.notifications)
+            if (grp && grp.notifications)
                 count += grp.notifications.length;
         }
         return count;
@@ -329,12 +344,12 @@ Item {
         if (root.isMediaPlaying) {
             return MprisController.trackTitle || "Playing";
         }
-        return root.screenFocusedClient?.title || "Desktop";
+        return (root.screenFocusedClient && root.screenFocusedClient.title) ? root.screenFocusedClient.title : "Desktop";
     }
 
     readonly property bool isHovered: revealHoverHandler.hovered && root.currentMode === "collapsed" && !root.retractingToHidden
     property bool debounceActive: false
-    readonly property bool isPinned: Config.bar?.pinned ?? false
+    readonly property bool isPinned: (Config.bar && Config.bar.pinned) ? true : false
 
     readonly property bool barAlwaysVisible: !NiriService.overviewOpen && (root.isPinned || !hasWindowTouchingTop)
     readonly property bool barNormallyVisible: barAlwaysVisible || isHovered || debounceActive
@@ -344,7 +359,7 @@ Item {
             return false;
         if (currentMode === "osd")
             return true;
-        if (root.isExpanded)
+        if (root.isExpanded || root.isMorphing)
             return true;
         return barNormallyVisible;
     }
@@ -405,19 +420,16 @@ Item {
     }
 
     // Shared enter/leave choreography for every surface
+    // Shared enter/leave choreography for every surface with Modesty-style aperture blooming
     component IslandPage: Item {
         id: page
 
         required property bool active
 
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: root.targetWidth
-        height: root.targetHeight
-        transformOrigin: Item.Top
+        anchors.fill: parent
         z: page.active ? 1 : 0
         visible: page.active || opacity > 0.001
-        enabled: page.visible
+        enabled: page.active && root.isExpanded
 
         MouseArea {
             anchors.fill: parent
@@ -429,93 +441,47 @@ Item {
             onWheel: wheel => wheel.accepted = true
         }
 
-        property real drift: page.active ? 0 : -8
-        property real scaleFactor: page.active ? 1.0 : 0.94
-        transform: [
-            Translate {
-                y: page.drift
-            },
-            Scale {
-                origin.x: page.width / 2
-                origin.y: 0
-                xScale: page.scaleFactor
-                yScale: page.scaleFactor
-            }
-        ]
+        readonly property real presentationScale: Math.max(0, Math.min(1, Math.min(
+            expandedCard.width / Math.max(1, root.targetCardWidth),
+            expandedCard.height / Math.max(1, root.targetCardHeight)
+        )))
 
-        opacity: page.active ? 1.0 : 0.0
+        readonly property real revealAmount: {
+            if (!page.active || root.retractingToHidden) return 0.0;
+            if (!root.isMorphing || presentationScale >= 0.98) return 1.0;
+            const t = Math.max(0, Math.min(1, (presentationScale - 0.45) / 0.53));
+            return t * t * (3 - 2 * t);
+        }
 
-        states: [
-            State {
-                name: "shown"
-                when: page.active && !root.retractingToHidden
-                PropertyChanges {
-                    target: page
-                    opacity: 1.0
-                    drift: 0
-                    scaleFactor: 1.0
-                }
-            },
-            State {
-                name: "hidden"
-                when: !page.active || root.retractingToHidden
-                PropertyChanges {
-                    target: page
-                    opacity: 0.0
-                    drift: -8
-                    scaleFactor: 0.94
-                }
-            }
-        ]
+        opacity: page.active ? (root.isMorphing ? page.revealAmount : 1.0) : 0.0
 
-        transitions: [
-            Transition {
-                to: "shown"
-                enabled: Motion.enabled
-                SequentialAnimation {
-                    PauseAnimation {
-                        duration: Motion.contentEnterDelay
-                    }
-                    ParallelAnimation {
-                        NumberAnimation {
-                            property: "opacity"
-                            duration: Motion.fadeInDuration
-                            easing.type: Easing.OutCubic
-                        }
-                        NumberAnimation {
-                            property: "scaleFactor"
-                            duration: Motion.fadeInDuration
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 1.15
-                        }
-                        NumberAnimation {
-                            property: "drift"
-                            duration: Motion.fadeInDuration
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-                }
-            },
-            Transition {
-                from: "shown"
-                enabled: Motion.enabled
-                NumberAnimation {
-                    properties: "opacity,scaleFactor,drift"
-                    duration: Motion.fadeOutDuration
-                    easing.type: Easing.OutQuad
-                }
+        Behavior on opacity {
+            enabled: Motion.enabled && !root.isMorphing
+            NumberAnimation {
+                duration: Motion.fadeInDuration
+                easing.type: Easing.OutCubic
             }
-        ]
+        }
     }
 
     function calculateTargetWidth(mode: string): int {
-        if (mode === "osd") {
+        switch (mode) {
+        case "osd":
             return Math.min(300, root.width - 32);
-        }
-        if (mode === "wallpapers") {
+        case "apps":
+        case "projects":
+        case "alerts":
+            return Math.min(480, root.width - 32);
+        case "wallpapers":
             return Math.min(540, root.width - 32);
+        case "sound":
+        case "mic":
+        case "wifi":
+        case "bluetooth":
+            return Math.min(400, root.width - 32);
+        default:
+            return Math.min(420, root.width - 32);
         }
-        return Math.min(420, root.width - 32);
     }
 
     function calculateTargetHeight(mode: string): int {
@@ -523,7 +489,7 @@ Item {
         case "osd":
             return osdView.implicitHeight > 0 ? osdView.implicitHeight : 48;
         case "notification":
-            return (notificationView.implicitHeight > 0) ? notificationView.implicitHeight : root.pillHeight;
+            return (notificationView.implicitHeight > 0) ? Math.max(notificationView.implicitHeight, 96) : 96;
         case "dashboard":
             return dashboardView.implicitHeight;
         case "power":
@@ -552,7 +518,7 @@ Item {
             return calendarView.implicitHeight;
         case "apps":
         case "projects":
-            return launcherViewWrapper.implicitHeight;
+            return (launcherViewWrapper.implicitHeight > 0) ? launcherViewWrapper.implicitHeight : 336;
         default:
             return root.pillHeight;
         }
@@ -560,6 +526,31 @@ Item {
 
     readonly property int targetWidth: calculateTargetWidth(root.currentMode)
     readonly property int targetHeight: calculateTargetHeight(root.currentMode)
+
+    onTargetHeightChanged: {
+        if (root.isExpanded && !root.isMorphing) {
+            root.targetCardHeight = root.targetHeight;
+        }
+    }
+
+    onTargetWidthChanged: {
+        if (root.isExpanded && !root.isMorphing) {
+            root.targetCardWidth = root.targetWidth;
+            root.targetCardX = Math.round((root.width - root.targetWidth) / 2);
+        }
+    }
+
+    Connections {
+        target: notificationView
+        function onImplicitHeightChanged() {
+            if (root.currentMode === "notification" && root.isExpanded) {
+                const h = root.calculateTargetHeight("notification");
+                if (h > 0 && root.targetCardHeight !== h) {
+                    root.targetCardHeight = h;
+                }
+            }
+        }
+    }
 
     property Item activeSourcePill: null
 
@@ -603,7 +594,18 @@ Item {
         const rowLeft = Math.round((root.width - pillsRow.implicitWidth) / 2);
         return rowLeft + pill.x;
     }
-    readonly property real sourcePillWidth: resolvedSourcePill ? resolvedSourcePill.width : root.pillHeight
+    readonly property real sourcePillWidth: {
+        const pill = resolvedSourcePill;
+        if (!pill)
+            return root.pillHeight;
+        return (pill.implicitWidth > 0) ? pill.implicitWidth : (pill.width > 0 ? pill.width : root.pillHeight);
+    }
+
+    readonly property real flankPartDistance: 0
+
+    function flankTranslation(pill: Item): real {
+        return 0;
+    }
 
     property real targetCardWidth: Math.round(sourcePillWidth)
     property real targetCardHeight: root.pillHeight
@@ -638,7 +640,7 @@ Item {
             Qt.callLater(() => {
                 if (root.currentMode === "collapsed" && root.hasNotifications) {
                     root.openedFromHidden = !root.barAlwaysVisible;
-                    root.currentMode = "notification";
+                    root.expand("notification");
                 }
             });
         }
@@ -667,6 +669,21 @@ Item {
     property real osdValue: 0.0
     property bool osdMuted: false
 
+    // Inline OSD State (Modesty non-disruptive inline status feedback)
+    property bool inlineOsdActive: false
+    property string inlineOsdIcon: Icons.volume
+    property real inlineOsdValue: 0.0
+    property string inlineOsdText: "0%"
+
+    Timer {
+        id: inlineOsdTimer
+        interval: 1800
+        repeat: false
+        onTriggered: {
+            root.inlineOsdActive = false;
+        }
+    }
+
     Timer {
         id: islandOsdTimer
         interval: 2200
@@ -691,10 +708,14 @@ Item {
         root.osdIndicator = indicator;
         root.osdValue = value;
         root.osdMuted = muted;
-        if (root.currentMode === "collapsed" || root.currentMode === "osd") {
-            if (root.currentMode === "collapsed") {
-                root.expand("osd");
-            } else if (root.retractingToHidden) {
+        if (root.currentMode === "collapsed") {
+            root.inlineOsdIcon = muted ? Icons.volumeMute : (indicator === "brightness" ? Icons.sun : (indicator === "mic" ? Icons.mic : Icons.volume));
+            root.inlineOsdValue = value;
+            root.inlineOsdText = muted ? "Muted" : (Math.round(value * 100) + "%");
+            root.inlineOsdActive = true;
+            inlineOsdTimer.restart();
+        } else if (root.currentMode === "osd") {
+            if (root.retractingToHidden) {
                 root.retractingToHidden = false;
                 retractFinishTimer.stop();
                 slideUpAnim.stop();
@@ -821,17 +842,9 @@ Item {
         y: root.topMargin + root.containerY
         width: pillsRow.implicitWidth
         height: root.pillHeight
-        visible: !root.isExpanded && !root.retractingToHidden && !root.openedFromHidden && !root.isMorphing && root.revealProgress > 0.001
+        visible: !root.retractingToHidden && !root.openedFromHidden && root.revealProgress > 0.001
         enabled: !root.isExpanded && !root.retractingToHidden && !root.isMorphing
-        opacity: (root.isExpanded || root.retractingToHidden || root.openedFromHidden || root.isMorphing) ? 0.0 : root.contentReveal
-
-        Behavior on opacity {
-            enabled: Motion.enabled
-            NumberAnimation {
-                duration: Motion.fadeOutDuration
-                easing.type: Easing.OutCubic
-            }
-        }
+        opacity: root.contentReveal
 
             RowLayout {
                 id: pillsRow
@@ -842,26 +855,112 @@ Item {
                 StyledRect {
                     id: contextPill
                     implicitHeight: root.pillHeight
-                    implicitWidth: Math.min(fluidContextText.implicitWidth + 24, 224)
+                    implicitWidth: Math.min(
+                        fluidContextText.implicitWidth + (root.isMediaPlaying ? 42 : 24),
+                        root.isMediaPlaying ? 340 : 236
+                    )
                     variant: "pane"
                     radius: root.pillRadius
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
-                    scale: contextMouse.pressed ? 0.94 : 1.0
 
-                    PressBehavior on scale {
-                        pressed: contextMouse.pressed
+                    readonly property bool isHovered: contextHover.hovered && !root.isExpanded && !root.isMorphing
+                    readonly property bool isPressed: contextMouse.pressed && isHovered
+
+                    scale: isPressed ? 0.94 : 1.0
+                    opacity: (root.isExpanded || root.isMorphing) ? 0.0 : 1.0
+
+                    Behavior on opacity {
+                        enabled: Motion.enabled && !root.snapGeometry
+                        NumberAnimation {
+                            duration: (root.isExpanded || root.isMorphing) ? Motion.fadeOutDuration : 140
+                            easing.type: Easing.OutCubic
+                        }
                     }
 
-                    Item {
+                    transform: Translate {
+                        x: root.flankTranslation(contextPill)
+                        y: (contextPill.isHovered && !contextPill.isPressed) ? -1.5 : 0
+                        Behavior on x {
+                            enabled: Motion.enabled && !root.snapGeometry
+                            NumberAnimation {
+                                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1.15
+                            }
+                        }
+                        Behavior on y {
+                            enabled: Motion.enabled
+                            NumberAnimation {
+                                duration: 180
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    SurfaceLighting {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        active: !root.isExpanded
+                        interactive: true
+                    }
+
+                    PressBehavior on scale {
+                        pressed: contextPill.isPressed
+                    }
+
+                    HoverHandler {
+                        id: contextHover
+                        enabled: !root.isExpanded && !root.isMorphing
+                    }
+
+                    RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 12
                         anchors.rightMargin: 12
+                        anchors.topMargin: 2
+                        anchors.bottomMargin: 3
+                        spacing: root.isMediaPlaying ? 6 : 0
+
+                        // 4 subtle animated media visualizer bars
+                        Row {
+                            spacing: 2
+                            visible: root.isMediaPlaying
+                            Layout.alignment: Qt.AlignVCenter
+
+                            Repeater {
+                                model: 4
+                                Rectangle {
+                                    id: vizBar
+                                    required property int index
+                                    width: 2.5
+                                    radius: 1.25
+                                    color: Colors.primary
+                                    height: root.isMediaPlaying ? (4 + ((index * 3 + 2) % 10)) : 3
+
+                                    SequentialAnimation on height {
+                                        running: root.isMediaPlaying && vizBar.visible
+                                        loops: Animation.Infinite
+                                        NumberAnimation {
+                                            to: 12 - (vizBar.index % 3) * 3
+                                            duration: 180 + vizBar.index * 45
+                                            easing.type: Easing.InOutQuad
+                                        }
+                                        NumberAnimation {
+                                            to: 4 + (vizBar.index % 2) * 2
+                                            duration: 160 + vizBar.index * 40
+                                            easing.type: Easing.InOutQuad
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         FluidTextProgress {
                             id: fluidContextText
-                            anchors.fill: parent
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
                             text: root.contextLabel
                             fontFamily: Config.theme.font
                             pixelSize: Styling.fontSize(-1)
@@ -880,7 +979,7 @@ Item {
                         id: contextMouse
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
+                        hoverEnabled: false
                         onClicked: {
                             if (root.isMediaPlaying)
                                 root.expand("media");
@@ -890,8 +989,8 @@ Item {
                     }
 
                     StyledToolTip {
-                        show: contextMouse.containsMouse
-                        tooltipText: root.isMediaPlaying ? "Now Playing: " + root.contextLabel : (root.screenFocusedClient?.title || "Active Window")
+                        show: contextPill.isHovered
+                        tooltipText: root.isMediaPlaying ? "Now Playing: " + root.contextLabel : ((root.screenFocusedClient && root.screenFocusedClient.title) ? root.screenFocusedClient.title : "Active Window")
                         description: root.isMediaPlaying ? "Click to open Media Center" : "Click to switch windows / apps"
                     }
                 }
@@ -906,27 +1005,68 @@ Item {
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
-                    scale: timeMouse.pressed ? 0.94 : 1.0
 
-                    PressBehavior on scale {
-                        pressed: timeMouse.pressed
+                    readonly property bool isHovered: timeHover.hovered && !root.isExpanded && !root.isMorphing
+                    readonly property bool isPressed: timeMouse.pressed && isHovered
+
+                    scale: isPressed ? 0.94 : 1.0
+                    opacity: (root.isExpanded || root.isMorphing) ? 0.0 : 1.0
+
+                    Behavior on opacity {
+                        enabled: Motion.enabled && !root.snapGeometry
+                        NumberAnimation {
+                            duration: (root.isExpanded || root.isMorphing) ? Motion.fadeOutDuration : 140
+                            easing.type: Easing.OutCubic
+                        }
                     }
 
-                    Text {
+                    transform: Translate {
+                        x: root.flankTranslation(timePill)
+                        y: (timePill.isHovered && !timePill.isPressed) ? -1.5 : 0
+                        Behavior on x {
+                            enabled: Motion.enabled && !root.snapGeometry
+                            NumberAnimation {
+                                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1.15
+                            }
+                        }
+                        Behavior on y {
+                            enabled: Motion.enabled
+                            NumberAnimation {
+                                duration: 180
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    SurfaceLighting {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        active: !root.isExpanded
+                        interactive: true
+                    }
+
+                    PressBehavior on scale {
+                        pressed: timePill.isPressed
+                    }
+
+                    HoverHandler {
+                        id: timeHover
+                        enabled: !root.isExpanded && !root.isMorphing
+                    }
+
+                    SlidingDigits {
                         id: timeText
                         anchors.centerIn: parent
                         text: root.formattedTime
-                        font.family: Config.theme.monoFont
-                        font.pixelSize: Styling.fontSize(-1)
-                        font.bold: true
-                        color: timeMouse.containsMouse ? Colors.primary : Colors.overBackground
-                        renderType: Text.NativeRendering
+                        color: timePill.isHovered ? Colors.primary : Colors.overBackground
                     }
 
                     MouseArea {
                         id: timeMouse
                         anchors.fill: parent
-                        hoverEnabled: true
+                        hoverEnabled: false
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         cursorShape: Qt.PointingHandCursor
                         onClicked: mouse => {
@@ -939,7 +1079,7 @@ Item {
                     }
 
                     StyledToolTip {
-                        show: timeMouse.containsMouse
+                        show: timePill.isHovered
                         tooltipText: root.formattedDate
                         description: "Left-click: Dashboard • Right-click: Calendar"
                     }
@@ -955,6 +1095,34 @@ Item {
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
+                    opacity: (root.isExpanded || root.isMorphing) ? 0.0 : 1.0
+
+                    Behavior on opacity {
+                        enabled: Motion.enabled && !root.snapGeometry
+                        NumberAnimation {
+                            duration: (root.isExpanded || root.isMorphing) ? Motion.fadeOutDuration : 140
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    transform: Translate {
+                        x: root.flankTranslation(workspacesPill)
+                        Behavior on x {
+                            enabled: Motion.enabled && !root.snapGeometry
+                            NumberAnimation {
+                                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1.15
+                            }
+                        }
+                    }
+
+                    SurfaceLighting {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        active: !root.isExpanded
+                        interactive: true
+                    }
 
                     NonchalantTaskbar {
                         id: taskbar
@@ -968,17 +1136,127 @@ Item {
                 StyledRect {
                     id: statusPill
                     implicitHeight: root.pillHeight
-                    implicitWidth: statusIcons.implicitWidth + 16
+                    implicitWidth: root.inlineOsdActive ? (statusIcons.implicitWidth + 140) : (statusIcons.implicitWidth + 16)
                     variant: "pane"
                     radius: root.pillRadius
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
+                    opacity: (root.isExpanded || root.isMorphing) ? 0.0 : 1.0
 
+                    readonly property bool isHovered: statusHover.hovered && !root.isExpanded && !root.isMorphing
+
+                    Behavior on opacity {
+                        enabled: Motion.enabled && !root.snapGeometry
+                        NumberAnimation {
+                            duration: (root.isExpanded || root.isMorphing) ? Motion.fadeOutDuration : 140
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    Behavior on implicitWidth {
+                        enabled: Motion.enabled
+                        NumberAnimation {
+                            duration: 180
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    transform: Translate {
+                        x: root.flankTranslation(statusPill)
+                        y: statusPill.isHovered ? -1.5 : 0
+                        Behavior on x {
+                            enabled: Motion.enabled && !root.snapGeometry
+                            NumberAnimation {
+                                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1.15
+                            }
+                        }
+                        Behavior on y {
+                            enabled: Motion.enabled
+                            NumberAnimation {
+                                duration: 180
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    SurfaceLighting {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        active: !root.isExpanded
+                        interactive: true
+                    }
+
+                    HoverHandler {
+                        id: statusHover
+                        enabled: !root.isExpanded && !root.isMorphing
+                    }
+
+                    // Collapsed standard status icons
                     IslandStatusIcons {
                         id: statusIcons
                         anchors.centerIn: parent
                         bar: root
+                        visible: !root.inlineOsdActive
+                        opacity: root.inlineOsdActive ? 0.0 : 1.0
+                        Behavior on opacity {
+                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    // Modesty inline OSD slider and percentage
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+                        visible: root.inlineOsdActive
+                        opacity: root.inlineOsdActive ? 1.0 : 0.0
+                        Behavior on opacity {
+                            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                        }
+
+                        Text {
+                            text: root.inlineOsdIcon
+                            font.family: Icons.font
+                            font.pixelSize: 13
+                            color: Colors.primary
+                            renderType: Text.NativeRendering
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 4
+                            radius: 2
+                            color: Colors.withAlpha(Colors.overBackground, 0.15)
+                            clip: true
+
+                            Rectangle {
+                                width: parent.width * Math.max(0, Math.min(1, root.inlineOsdValue))
+                                height: 4
+                                radius: 2
+                                color: Colors.primary
+                                Behavior on width {
+                                    enabled: Motion.enabled
+                                    SmoothedAnimation {
+                                        velocity: -1
+                                        duration: 90
+                                        reversingMode: SmoothedAnimation.Immediate
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: root.inlineOsdText
+                            font.family: Config.theme.monoFont
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.bold: true
+                            color: Colors.overBackground
+                            renderType: Text.NativeRendering
+                        }
                     }
                 }
 
@@ -993,10 +1271,55 @@ Item {
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
-                    scale: alertsMouse.pressed ? 0.90 : 1.0
+
+                    readonly property bool isHovered: alertsHover.hovered && !root.isExpanded && !root.isMorphing
+                    readonly property bool isPressed: alertsMouse.pressed && isHovered
+
+                    scale: isPressed ? 0.90 : 1.0
+                    opacity: (root.isExpanded || root.isMorphing) ? 0.0 : 1.0
+
+                    Behavior on opacity {
+                        enabled: Motion.enabled && !root.snapGeometry
+                        NumberAnimation {
+                            duration: (root.isExpanded || root.isMorphing) ? Motion.fadeOutDuration : 140
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    transform: Translate {
+                        x: root.flankTranslation(alertsPill)
+                        y: (alertsPill.isHovered && !alertsPill.isPressed) ? -1.5 : 0
+                        Behavior on x {
+                            enabled: Motion.enabled && !root.snapGeometry
+                            NumberAnimation {
+                                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1.15
+                            }
+                        }
+                        Behavior on y {
+                            enabled: Motion.enabled
+                            NumberAnimation {
+                                duration: 180
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    SurfaceLighting {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        active: !root.isExpanded
+                        interactive: true
+                    }
 
                     PressBehavior on scale {
-                        pressed: alertsMouse.pressed
+                        pressed: alertsPill.isPressed
+                    }
+
+                    HoverHandler {
+                        id: alertsHover
+                        enabled: !root.isExpanded && !root.isMorphing
                     }
 
                     RowLayout {
@@ -1008,7 +1331,7 @@ Item {
                             text: Icons.bell
                             font.family: Icons.font
                             font.pixelSize: 13
-                            color: root.hasNotifications ? Colors.primary : (alertsMouse.containsMouse ? Colors.primary : Colors.overBackground)
+                            color: root.hasNotifications ? Colors.primary : (alertsPill.isHovered ? Colors.primary : Colors.overBackground)
                             renderType: Text.NativeRendering
                         }
 
@@ -1017,7 +1340,7 @@ Item {
                             font.family: Config.theme.monoFont
                             font.pixelSize: Styling.fontSize(-2)
                             font.bold: true
-                            color: root.hasNotifications ? Colors.primary : (alertsMouse.containsMouse ? Colors.primary : Colors.overBackground)
+                            color: root.hasNotifications ? Colors.primary : (alertsPill.isHovered ? Colors.primary : Colors.overBackground)
                             renderType: Text.NativeRendering
                         }
                     }
@@ -1025,13 +1348,13 @@ Item {
                     MouseArea {
                         id: alertsMouse
                         anchors.fill: parent
-                        hoverEnabled: true
+                        hoverEnabled: false
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.expand("alerts")
                     }
 
                     StyledToolTip {
-                        show: alertsMouse.containsMouse
+                        show: alertsPill.isHovered
                         tooltipText: root.alertsCount + " notification" + (root.alertsCount === 1 ? "" : "s")
                         description: "Click to open alerts panel"
                     }
@@ -1047,10 +1370,55 @@ Item {
                     enableBorder: true
                     enableShadow: true
                     backgroundOpacity: 1.0
-                    scale: pinMouse.pressed ? 0.92 : 1.0
+
+                    readonly property bool isHovered: pinHover.hovered && !root.isExpanded && !root.isMorphing
+                    readonly property bool isPressed: pinMouse.pressed && isHovered
+
+                    scale: isPressed ? 0.92 : 1.0
+                    opacity: (root.isExpanded || root.isMorphing) ? 0.0 : 1.0
+
+                    Behavior on opacity {
+                        enabled: Motion.enabled && !root.snapGeometry
+                        NumberAnimation {
+                            duration: (root.isExpanded || root.isMorphing) ? Motion.fadeOutDuration : 140
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    transform: Translate {
+                        x: root.flankTranslation(pinPill)
+                        y: (pinPill.isHovered && !pinPill.isPressed) ? -1.5 : 0
+                        Behavior on x {
+                            enabled: Motion.enabled && !root.snapGeometry
+                            NumberAnimation {
+                                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1.15
+                            }
+                        }
+                        Behavior on y {
+                            enabled: Motion.enabled
+                            NumberAnimation {
+                                duration: 180
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    SurfaceLighting {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        active: !root.isExpanded
+                        interactive: true
+                    }
 
                     PressBehavior on scale {
-                        pressed: pinMouse.pressed
+                        pressed: pinPill.isPressed
+                    }
+
+                    HoverHandler {
+                        id: pinHover
+                        enabled: !root.isExpanded && !root.isMorphing
                     }
 
                     Text {
@@ -1058,15 +1426,15 @@ Item {
                         text: root.isPinned ? Icons.pin : Icons.unpin
                         font.family: Icons.font
                         font.pixelSize: 13
-                        color: root.isPinned ? Colors.primary : (pinMouse.containsMouse ? Colors.primary : Colors.overBackground)
-                        opacity: root.isPinned ? 1.0 : (pinMouse.containsMouse ? 1.0 : 0.7)
+                        color: root.isPinned ? Colors.primary : (pinPill.isHovered ? Colors.primary : Colors.overBackground)
+                        opacity: root.isPinned ? 1.0 : (pinPill.isHovered ? 1.0 : 0.7)
                         renderType: Text.NativeRendering
                     }
 
                     MouseArea {
                         id: pinMouse
                         anchors.fill: parent
-                        hoverEnabled: true
+                        hoverEnabled: false
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (Config.bar) {
@@ -1076,7 +1444,7 @@ Item {
                     }
 
                     StyledToolTip {
-                        show: pinMouse.containsMouse
+                        show: pinPill.isHovered
                         tooltipText: root.isPinned ? "Unpin Bar" : "Pin Bar"
                         description: root.isPinned ? "Autohide disabled (reserves window space)" : "Keep floating bar visible and reserve window space"
                     }
@@ -1099,9 +1467,17 @@ Item {
         enableShadow: true
         backgroundOpacity: 1.0
         clip: true
-        visible: (root.isExpanded || root.retractingToHidden || root.isMorphing) && root.revealProgress > 0.001
+        visible: (root.isExpanded || root.retractingToHidden || root.isMorphing || opacity > 0.001) && root.revealProgress > 0.001
         opacity: (root.isExpanded || root.retractingToHidden || root.isMorphing) ? 1.0 : 0.0
         z: 10
+
+        Behavior on opacity {
+            enabled: Motion.enabled && !root.snapGeometry
+            NumberAnimation {
+                duration: root.isExpanded ? 0 : 140
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Behavior on x {
             enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && root.isMorphing && !root.snapGeometry
@@ -1128,6 +1504,22 @@ Item {
                 easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
                 easing.overshoot: Motion.overshoot
             }
+        }
+
+        Behavior on radius {
+            enabled: Motion.enabled && (root.shouldBeRevealed || root.isExpanded) && !root.retractingToHidden && root.isMorphing && !root.snapGeometry
+            NumberAnimation {
+                duration: root.isExpanded ? Motion.expandDuration : Motion.collapseDuration
+                easing.type: root.isExpanded ? Easing.OutBack : Easing.OutCubic
+                easing.overshoot: Motion.overshoot
+            }
+        }
+
+        SurfaceLighting {
+            anchors.fill: parent
+            radius: root.targetCardRadius
+            active: root.isExpanded || root.isMorphing
+            interactive: true
         }
 
         MouseArea {

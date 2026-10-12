@@ -30,8 +30,9 @@ Item {
     }
     readonly property int count: Notifications.popupList ? Notifications.popupList.length : 0
 
+    width: 420
     implicitWidth: 420
-    implicitHeight: activeNotif ? Math.max(contentCol.implicitHeight + 24, 76) : 0
+    implicitHeight: activeNotif ? Math.max(contentCol.implicitHeight + 28, 86) : 0
 
     signal dismissRequested
 
