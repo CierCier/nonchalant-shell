@@ -89,8 +89,24 @@ Lyrics follow the selected MPRIS player. Timed lines follow playback and can be
 clicked to seek; plain lyrics scroll manually. Shell settings provide separate
 media-player and lockscreen switches. The collapsed bar keeps showing the track
 or focused window title. Media panels collapse the lyrics area until usable
-lyrics arrive. While a media panel is open, track title, artist,
-album, and duration are sent to [LRCLIB](https://lrclib.net). Results are cached
+lyrics arrive. Cider playback uses the exact Apple Music recording ID from its
+local API and prefers Apple's word timings. Timed words highlight in all media
+views, including the lockscreen's current-line-only player. Songs with line or
+plain lyrics keep those formats. Long word-timed lines follow the current word
+horizontally in compact views.
+
+The Cider integration uses `http://127.0.0.1:10767` and its external playback
+and account APIs. Its internal lyrics endpoint is restricted in current Cider
+builds, so the helper reads the authorized session through `/api/v2/client/tokens`
+and requests the same Apple Music lyrics endpoint as Cider. Credentials stay in
+the helper process and are never written to the shell configuration or cache.
+If Cider requires an app token, set `CIDER_API_TOKEN_FILE` in the shell's
+environment to a private file containing a token with `playback` and `account`
+scopes. `CIDER_PORT` selects a custom local port. The integration adds no Python
+dependencies and needs no Cider plugin.
+
+For other players, or when Cider's API or lyrics are unavailable, track title,
+artist, album, and duration are sent to [LRCLIB](https://lrclib.net). Results are cached
 under `$XDG_STATE_HOME/nonchalant/lyrics`. Closed panels do not start new lookups
 or retries. Changing tracks or closing the last active lyrics view cancels the
 old lookup and discards its output.

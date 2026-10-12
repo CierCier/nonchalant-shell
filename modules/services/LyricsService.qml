@@ -22,7 +22,9 @@ Singleton {
     property list<var> lines: []
     property bool synced: false
     property bool instrumental: false
+    property string source: ""
     property int current: -1
+    property real playbackPosition: 0
     property real anchorPosition: 0
     property real anchorTime: 0
 
@@ -30,6 +32,15 @@ Singleton {
         && MprisController.trackTitle.trim() !== ""
     readonly property bool youtubeTrack: /^https?:\/\/(?:(?:[a-z0-9-]+\.)*youtube\.com|youtu\.be)(?:[\/?#]|$)/i.test(
         MprisController.activePlayer?.metadata?.["xesam:url"] ?? "")
+    readonly property bool ciderPlayer: /^org\.mpris\.MediaPlayer2\.cider(?:\.|$)/i.test(
+        MprisController.activePlayer?.dbusName ?? "")
+    readonly property string ciderTrackId: {
+        if (!root.ciderPlayer)
+            return "";
+        // Quickshell exposes D-Bus object paths as QVariant strings on this Qt build.
+        const path = String(MprisController.activePlayer?.metadata?.["mpris:trackid"] ?? "");
+        return path.match(/\/([A-Za-z0-9_.-]+)(?=["')]|$)/)?.[1] ?? "";
+    }
     readonly property string track: {
         const player = MprisController.activePlayer;
         if (!player || !MprisController.trackTitle.trim())
@@ -40,7 +51,8 @@ Singleton {
             MprisController.trackTitle,
             player.trackAlbum || "",
             Math.round(MprisController.length),
-            root.youtubeTrack
+            root.youtubeTrack,
+            root.ciderTrackId
         ].join("\n");
     }
     readonly property bool wanted: root.watchers > 0 && root.hasTrack
@@ -53,7 +65,7 @@ Singleton {
         && root.current >= 0 && root.current + 1 < root.lines.length
         ? root.lines[root.current + 1].text : ""
 
-    readonly property real lead: 0.25
+    readonly property real lead: root.source === "cider" ? 0 : 0.25
 
     onTrackChanged: root.resetTrack()
     onWantedChanged: {
@@ -83,7 +95,7 @@ Singleton {
     }
 
     Timer {
-        interval: 120
+        interval: root.source === "cider" ? 33 : 120
         running: root.wanted && root.available && root.synced && MprisController.isPlaying
         repeat: true
         onTriggered: root.place()
@@ -110,6 +122,7 @@ Singleton {
         root.lines = [];
         root.synced = false;
         root.instrumental = false;
+        root.source = "";
         root.readFor = "";
         root.current = -1;
         root.retryAttempt = 0;
@@ -135,14 +148,15 @@ Singleton {
     }
 
     function place(): void {
+        const elapsed = MprisController.isPlaying
+            ? Math.max(0, (Date.now() - root.anchorTime) / 1000) : 0;
+        root.playbackPosition = root.anchorPosition + elapsed;
         if (!root.available || !root.synced) {
             root.current = -1;
             return;
         }
 
-        const elapsed = MprisController.isPlaying
-            ? Math.max(0, (Date.now() - root.anchorTime) / 1000) : 0;
-        const now = root.anchorPosition + elapsed + root.lead;
+        const now = root.playbackPosition + root.lead;
         let low = 0;
         let high = root.lines.length;
         while (low < high) {
@@ -153,6 +167,9 @@ Singleton {
                 high = middle;
         }
         root.current = low - 1;
+        const line = root.lines[root.current];
+        if (line?.end >= 0 && now >= line.end)
+            root.current = -1;
     }
 
     function seekTo(seconds: real): bool {
@@ -200,6 +217,8 @@ Singleton {
             String(Math.round(MprisController.length)),
             root.youtubeTrack ? "https://youtube.com" : ""
         ];
+        if (root.ciderPlayer)
+            query.command = query.command.concat([root.ciderTrackId]);
         query.running = true;
     }
 
@@ -301,7 +320,31 @@ Singleton {
                 root.failNetwork(requested);
                 return;
             }
-            parsed.push({ t: time, text: line.text });
+            const end = line.end === undefined ? -1 : Number(line.end);
+            if (!Number.isFinite(end) || (end !== -1 && end <= time)) {
+                root.failNetwork(requested);
+                return;
+            }
+            const words = [];
+            if (line.words !== undefined && !Array.isArray(line.words)) {
+                root.failNetwork(requested);
+                return;
+            }
+            let lastEnd = 0;
+            for (const word of line.words ?? []) {
+                if (!Number.isFinite(word?.t) || !Number.isFinite(word?.end)
+                        || word.t < time || word.end <= word.t
+                        || (end >= 0 && word.end > end)
+                        || !Number.isInteger(word.start) || !Number.isInteger(word.length)
+                        || word.start < lastEnd || word.length <= 0
+                        || word.start + word.length > line.text.length) {
+                    root.failNetwork(requested);
+                    return;
+                }
+                words.push(word);
+                lastEnd = word.start + word.length;
+            }
+            parsed.push({ t: time, end: end, text: line.text, words: words });
         }
         if (parsed.length === 0) {
             root.lines = [];
@@ -316,6 +359,7 @@ Singleton {
         }
 
         root.lines = parsed;
+        root.source = report.source === "cider" ? "cider" : "lrclib";
         root.synced = report.synced === true;
         root.instrumental = false;
         root.readFor = requested;

@@ -88,7 +88,7 @@ Item {
                 }
 
                 StyledToolTip {
-                    visible: muteButton.hovered
+                    show: muteButton.hovered
                     tooltipText: root.isMuted ? "Unmute" : "Mute"
                 }
             }
@@ -154,7 +154,7 @@ Item {
                 color: Colors.warning
 
                 StyledToolTip {
-                    visible: parent.visible && protectionIndicatorMa.containsMouse
+                    show: parent.visible && protectionIndicatorMa.containsMouse
                     tooltipText: "Volume protection active"
                 }
 

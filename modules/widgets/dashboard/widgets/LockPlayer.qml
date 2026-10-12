@@ -25,8 +25,9 @@ StyledRect {
     }
 
     visible: MprisController.activePlayer !== null
-    height: GlobalStates.lockscreenVisible ? 118 : 96
-    radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
+    implicitHeight: contentLayout.implicitHeight + contentLayout.anchors.topMargin + contentLayout.anchors.bottomMargin
+    height: implicitHeight
+    radius: Styling.radius(0)
     backgroundOpacity: (MprisController.activePlayer || wallpaperPath !== "") ? 0.0 : 1.0
 
     Behavior on backgroundOpacity {
@@ -262,8 +263,8 @@ StyledRect {
                 LyricsView {
                     collapseWhenEmpty: true
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 22
-                    mode: "detail"
+                    Layout.preferredHeight: implicitHeight
+                    mode: "compact"
                     lyricsEnabled: Config.lockscreen.lyricsEnabled
                     active: GlobalStates.lockscreenVisible && !GlobalStates.lockscreenUnlocking
                 }

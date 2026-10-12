@@ -16,6 +16,7 @@ Item {
     readonly property bool hasLyrics: root.hasTrack && root.lyricsEnabled
         && LyricsService.available && !LyricsService.instrumental && LyricsService.lines.length > 0
     visible: !root.collapseWhenEmpty || root.hasLyrics
+    clip: root.mode === "compact"
 
     implicitHeight: root.mode === "detail" ? 140 : 22
     readonly property bool shouldRender: root.active && root.visible
@@ -51,6 +52,32 @@ Item {
         return "Lyrics, untimed";
     }
 
+    function escapeText(text: string): string {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // TTML word ranges retain original spacing, including unspaced scripts and syllables.
+    function timedText(index: int): string {
+        const line = LyricsService.lines[index];
+        if (!line || !line.words?.length)
+            return line?.text || "♪";
+        const position = LyricsService.playbackPosition;
+        let text = "";
+        let offset = 0;
+        for (const word of line.words) {
+            text += root.escapeText(line.text.slice(offset, word.start));
+            const fragment = root.escapeText(line.text.slice(word.start, word.start + word.length));
+            if (position >= word.t && position < word.end)
+                text += '<font color="' + Colors.primary + '"><u>' + fragment + '</u></font>';
+            else if (position >= word.end)
+                text += '<font color="' + Colors.primary + '">' + fragment + '</font>';
+            else
+                text += '<font color="' + Colors.overSurfaceVariant + '">' + fragment + '</font>';
+            offset = word.start + word.length;
+        }
+        return text + root.escapeText(line.text.slice(offset));
+    }
+
     function syncSubscription(): void {
         if (root.shouldSubscribe === root.subscribed)
             return;
@@ -68,19 +95,48 @@ Item {
             LyricsService.release();
     }
 
+    FontMetrics {
+        id: compactFontMetrics
+        font: compactLine.font
+    }
+
     Text {
-        anchors.fill: parent
+        id: compactLine
+        anchors.verticalCenter: parent.verticalCenter
+        width: wordTimed ? Math.max(root.width, compactFontMetrics.advanceWidth(root.compactText)) : root.width
+        height: root.height
         visible: root.shouldRender && root.mode === "compact"
-        text: root.compactText
-        textFormat: Text.PlainText
+        readonly property bool wordTimed: root.shouldRender && root.mode === "compact"
+            && root.lyricsEnabled && LyricsService.available && LyricsService.synced
+            && (LyricsService.lines[LyricsService.current]?.words?.length ?? 0) > 0
+        text: wordTimed ? root.timedText(LyricsService.current) : root.compactText
+        textFormat: wordTimed ? Text.StyledText : Text.PlainText
+        Accessible.name: root.compactText
+        x: {
+            if (!compactLine.wordTimed || width <= root.width)
+                return 0;
+            const words = LyricsService.lines[LyricsService.current].words;
+            const position = LyricsService.playbackPosition;
+            let character = words[0].start;
+            for (const word of words) {
+                if (word.t <= position)
+                    character = word.start + Math.floor(word.length / 2);
+            }
+            const prefix = LyricsService.lines[LyricsService.current].text.slice(0, character);
+            return Math.max(root.width - width,
+                Math.min(0, root.width / 2 - compactFontMetrics.advanceWidth(prefix)));
+        }
+        Behavior on x {
+            NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuad }
+        }
         color: root.lyricsEnabled && LyricsService.available && LyricsService.synced
             && LyricsService.current >= 0 ? Colors.primary : Colors.overSurfaceVariant
         font.family: Config.theme.font
         font.pixelSize: Styling.fontSize(-1)
         font.weight: Font.DemiBold
         wrapMode: Text.NoWrap
-        elide: Text.ElideRight
-        horizontalAlignment: Text.AlignHCenter
+        elide: wordTimed ? Text.ElideNone : Text.ElideRight
+        horizontalAlignment: wordTimed && width > root.width ? Text.AlignLeft : Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
     }
 
@@ -145,7 +201,7 @@ Item {
 
             activeFocusOnTab: seekable
             Accessible.role: seekable ? Accessible.Button : Accessible.StaticText
-            Accessible.name: lineText.text
+            Accessible.name: lyricLine.modelData.text
             Accessible.description: seekable ? "Seek to this lyric" : ""
             Accessible.onPressAction: {
                 if (lyricLine.seekable)
@@ -173,8 +229,11 @@ Item {
             Text {
                 id: lineText
                 anchors.fill: parent
-                text: lyricLine.modelData.text !== "" ? lyricLine.modelData.text : "♪"
-                textFormat: Text.PlainText
+                readonly property bool wordTimed: lyricLine.distance === 0
+                    && (lyricLine.modelData.words?.length ?? 0) > 0
+                text: wordTimed ? root.timedText(lyricLine.index)
+                    : (lyricLine.modelData.text !== "" ? lyricLine.modelData.text : "♪")
+                textFormat: wordTimed ? Text.StyledText : Text.PlainText
                 color: lyricLine.distance === 0 ? Colors.primary : Colors.overBackground
                 opacity: !LyricsService.synced || lyricLine.distance === 0
                     ? 1 : Math.max(0.24, 0.56 - 0.1 * lyricLine.distance)

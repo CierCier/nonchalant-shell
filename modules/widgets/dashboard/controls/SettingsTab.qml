@@ -535,7 +535,7 @@ Item {
                             }
 
                             StyledToolTip {
-                                visible: navButton.hovered
+                                show: navButton.hovered
                                 tooltipText: navSlot.modelData.helpText
                             }
 

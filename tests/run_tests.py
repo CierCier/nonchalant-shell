@@ -176,6 +176,7 @@ def main():
         run_unittest_suite("Tier 1: Feature Coverage", "tests.unit.test_tier1_features", collector, args.verbose)
         run_unittest_suite("Tier 1: Pills Bar Layout", "tests.unit.test_pills_bar", collector, args.verbose)
         run_unittest_suite("Tier 1: Lyrics Lookup", "tests.unit.test_lyrics", collector, args.verbose)
+        run_unittest_suite("Tier 1: Cider Lyrics", "tests.unit.test_cider_lyrics", collector, args.verbose)
         run_unittest_suite("Tier 1: Media Duration", "tests.unit.test_media_duration", collector, args.verbose)
 
     if run_all or args.tier2:
@@ -188,7 +189,9 @@ def main():
         run_unittest_suite("Tier 4: Real-World Scenarios", "tests.e2e.test_tier4_lifecycle", collector, args.verbose)
         run_unittest_suite("Tier 4: Settings and Lyrics Runtime", "tests.e2e.test_settings_lyrics_runtime", collector, args.verbose)
         run_unittest_suite("Tier 4: MPRIS Duration Runtime", "tests.e2e.test_mpris_runtime", collector, args.verbose)
+        run_unittest_suite("Tier 4: Cider Lyrics Runtime", "tests.e2e.test_cider_lyrics_runtime", collector, args.verbose)
         run_unittest_suite("Tier 4: Bar Context Text Runtime", "tests.e2e.test_bar_text_runtime", collector, args.verbose)
+        run_unittest_suite("Tier 4: Tooltip Lifecycle Runtime", "tests.e2e.test_tooltip_runtime", collector, args.verbose)
 
     if args.json:
         report = {

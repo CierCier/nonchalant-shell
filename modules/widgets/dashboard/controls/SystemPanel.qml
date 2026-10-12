@@ -386,7 +386,7 @@ Item {
                                         }
 
                                         StyledToolTip {
-                                            visible: removeDiskArea.containsMouse
+                                            show: removeDiskArea.containsMouse
                                             tooltipText: "Remove disk"
                                         }
                                     }

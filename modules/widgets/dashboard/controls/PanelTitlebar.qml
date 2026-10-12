@@ -128,7 +128,7 @@ RowLayout {
             }
 
             StyledToolTip {
-                visible: actionButton.hovered && actionButton.modelData.tooltip
+                show: actionButton.hovered && actionButton.modelData.tooltip
                 tooltipText: actionButton.modelData.tooltip || ""
             }
         }

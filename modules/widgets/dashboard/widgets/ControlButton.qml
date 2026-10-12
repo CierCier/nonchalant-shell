@@ -70,7 +70,7 @@ StyledRect {
         onPressAndHold: root.longPressed()
 
         StyledToolTip {
-            visible: mouseArea.containsMouse
+            show: mouseArea.containsMouse
             tooltipText: root.tooltipText
         }
     }

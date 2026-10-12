@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fetch one track's lyrics from LRCLIB and cache the result locally.
+"""Prefer Cider's exact-recording lyrics, otherwise fetch and cache LRCLIB lyrics.
 
-Usage: lyrics.py <artist> <title> <album> <seconds> [source-url]
+Usage: lyrics.py <artist> <title> <album> <seconds> [source-url] [cider-track-id]
 
 The JSON response contains timed lines (`t` in seconds), plain lines (`t: -1`),
-an instrumental result, or a missing/network status. Successful answers are
-cached indefinitely; confirmed misses are cached for one week. Network errors
-are not cached so the caller can retry.
+an instrumental result, or a missing/network status. Successful LRCLIB answers
+are cached indefinitely; confirmed misses are cached for one week. Cider answers
+and network errors are not cached.
 """
 
 import hashlib
@@ -18,6 +18,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+if __package__:
+    from .cider_lyrics import report as cider_report
+else:
+    from cider_lyrics import report as cider_report
 
 ENDPOINT = "https://lrclib.net/api"
 TIMEOUT = 8
@@ -180,7 +185,11 @@ def parse(entry):
     return None
 
 
-def report(artist, title, album, seconds, source_url=""):
+def report(artist, title, album, seconds, source_url="", cider_track_id=None):
+    if cider_track_id is not None:
+        cider = cider_report(artist, title, cider_track_id)
+        if cider:
+            return cider
     video = is_youtube(source_url)
     artist, title = clean(artist, title, source_url)
     if not title:
@@ -218,13 +227,15 @@ def report(artist, title, album, seconds, source_url=""):
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:] + [""] * 5
+    args = sys.argv[1:]
+    cider_track_id = args[5] if len(args) > 5 else None
+    args += [""] * 5
     try:
         length = float(args[3] or 0)
     except ValueError:
         length = 0
     try:
-        print(json.dumps(report(args[0], args[1], args[2], length, args[4])))
+        print(json.dumps(report(args[0], args[1], args[2], length, args[4], cider_track_id)))
     except Exception as error:
         sys.stderr.write(f"lyrics failed: {error}\n")
         print(json.dumps({"available": False, "reason": "network"}))

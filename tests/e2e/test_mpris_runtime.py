@@ -19,6 +19,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.globals
 import qs.modules.services
 import qs.modules.components
 import qs.modules.bar.island
@@ -32,7 +33,7 @@ ShellRoot {
         IslandWaveformBar { id: waveform; width: 400; height: 38 }
         PositionSlider { id: slider; player: MprisController.activePlayer; width: 400; height: 30; y: 50 }
         FullPlayer { id: full; width: 400; height: 400; y: 100 }
-        LockPlayer { id: lock; width: 400; height: 150; y: 550 }
+        LockPlayer { id: lock; width: 350; y: 550 }
         IslandMediaCenterPanel { id: center; width: 420; height: implicitHeight; x: 500 }
         IslandMediaCard { id: card; width: 420; height: implicitHeight; x: 500; y: 500 }
         Process { id: control }
@@ -179,6 +180,49 @@ ShellRoot {
                 center.lyricsActive = false
                 card.lyricsActive = false
                 tryCompare(LyricsService, "watchers", 0, 1000)
+                const lockLyrics = controlOfType(lock, "LyricsView")
+                compare(lockLyrics.mode, "compact", "Lockscreen must show only the current lyric")
+                Config.lockscreen.lyricsEnabled = false
+                GlobalStates.lockscreenVisible = true
+                tryCompare(lockLyrics, "visible", false)
+                const emptyLockHeight = lock.implicitHeight
+                LyricsService.readFor = LyricsService.track
+                LyricsService.status = "timed"
+                LyricsService.synced = true
+                LyricsService.instrumental = false
+                LyricsService.lines = [
+                    {t: 0, text: "Previous lyric"},
+                    {t: 90, text: "Only the current lyric"},
+                    {t: 180, text: "Next lyric"}
+                ]
+                LyricsService.current = 1
+                Config.lockscreen.lyricsEnabled = true
+                tryCompare(LyricsService, "watchers", 1, 1000)
+                tryCompare(lockLyrics, "visible", true)
+                const currentLine = lockLyrics.children.find(child => child.text !== undefined && child.visible)
+                verify(currentLine !== undefined)
+                tryCompare(currentLine, "text", "Only the current lyric")
+                const scrollingLines = lockLyrics.children.find(child => child.currentIndex !== undefined)
+                verify(scrollingLines !== undefined)
+                compare(scrollingLines.visible, false)
+                compare(scrollingLines.count, 0, "Neighbor lyrics must not be rendered on the lockscreen")
+                tryVerify(() => lock.height === lock.implicitHeight && lock.height > emptyLockHeight)
+                verify(lock.height - emptyLockHeight <= lockLyrics.implicitHeight,
+                    "The card must grow only enough to fit its current lyric")
+                verify(lock.radius < lock.height / 2, "The card must have rectangular corners")
+                verify(currentLine.width > 0 && currentLine.height >= currentLine.implicitHeight)
+                verify(!currentLine.truncated, "The current fixture lyric must be fully readable")
+                LyricsService.current = 2
+                tryCompare(currentLine, "text", "Next lyric")
+                compare(lock.height, lock.implicitHeight)
+                GlobalStates.lockscreenUnlocking = true
+                tryCompare(LyricsService, "watchers", 0, 1000)
+                GlobalStates.lockscreenUnlocking = false
+                Config.lockscreen.lyricsEnabled = false
+                tryCompare(lockLyrics, "visible", false)
+                tryCompare(lock, "implicitHeight", emptyLockHeight)
+                GlobalStates.lockscreenVisible = false
+                console.log("LOCKSCREEN_CURRENT_LYRIC_RUNTIME_PASSED")
                 console.log("MPRIS_DURATION_RUNTIME_PASSED")
                 Qt.quit()
             }
@@ -193,7 +237,8 @@ ShellRoot {
 '''
 
 
-def exercise(fixture, video_id="invalid"):
+def exercise(fixture, video_id="invalid", player_name="nonchalant_test",
+             success_marker="MPRIS_DURATION_RUNTIME_PASSED"):
     import dbus
     import dbus.service
     from dbus.mainloop.glib import DBusGMainLoop
@@ -226,7 +271,7 @@ def exercise(fixture, video_id="invalid"):
                 "xesam:title": "Ella Langley - Choosin' Texas (Official Video)" if self.track == 1 else "Dracula",
                 "nonchalant:seekCount": dbus.Int64(self.seek_count),
                 "xesam:artist": dbus.Array(["EllaLangleyVEVO"], signature="s"),
-                "xesam:url": f"https://www.youtube.com/watch?v={self.source}",
+                "xesam:url": "" if player_name == "cider" else f"https://www.youtube.com/watch?v={self.source}",
             }
             if self.duration > 0:
                 data["mpris:length"] = dbus.Int64(self.duration * 1_000_000)
@@ -298,8 +343,13 @@ def exercise(fixture, video_id="invalid"):
             self.PropertiesChanged(interface, {"Metadata": self.metadata()}, [])
 
     bus = dbus.SessionBus()
-    name = dbus.service.BusName("org.mpris.MediaPlayer2.nonchalant_test", bus=bus)
+    name = dbus.service.BusName(f"org.mpris.MediaPlayer2.{player_name}", bus=bus)
     player = Player(name, "/org/mpris/MediaPlayer2")
+    other = None
+    if player_name == "cider":
+        other_bus = dbus.SessionBus(private=True)
+        other_name = dbus.service.BusName("org.mpris.MediaPlayer2.nonchalant_test", bus=other_bus)
+        other = Player(other_name, "/org/mpris/MediaPlayer2")
     loop = GLib.MainLoop()
     thread = threading.Thread(target=loop.run, daemon=True)
     thread.start()
@@ -310,11 +360,17 @@ def exercise(fixture, video_id="invalid"):
         )
         output = result.stdout + result.stderr
         print(output)
-        return 0 if result.returncode == 0 and "MPRIS_DURATION_RUNTIME_PASSED" in output else 1
+        if result.returncode:
+            print(f"Quickshell runtime exited with status {result.returncode}")
+        return 0 if result.returncode == 0 and success_marker in output else 1
     finally:
         loop.quit()
         thread.join(timeout=2)
         player.remove_from_connection()
+        if other is not None:
+            other.remove_from_connection()
+            del other, other_name
+            other_bus.close()
 
 
 @unittest.skipUnless(
@@ -364,7 +420,9 @@ print(json.dumps({'id': video_id, 'duration': 444 if video_id == 'slowtrack01' e
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, output)
             self.assertIn("MPRIS_DURATION_RUNTIME_PASSED", output, output)
+            self.assertIn("LOCKSCREEN_CURRENT_LYRIC_RUNTIME_PASSED", output, output)
             self.assertNotIn("MPRIS_DURATION_RUNTIME_TIMEOUT", output, output)
+            self.assertNotIn("Binding loop", output, output)
             canceled_pid = home / ".local/state/slow-extractor.pid"
             self.assertTrue(canceled_pid.exists(), "The slow extractor must have started before cancellation")
             pid = int(canceled_pid.read_text())
