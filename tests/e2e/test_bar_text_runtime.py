@@ -1,4 +1,4 @@
-"""Check rendered context labels in both bar layouts without touching the session."""
+"""Check bar labels, absent pin controls, and pin IPC without touching the session."""
 
 import os
 from pathlib import Path
@@ -13,8 +13,11 @@ QML = r'''
 import QtQuick
 import QtTest
 import Quickshell
+import Quickshell.Io
 import qs.config
 import qs.modules.bar.layouts
+import qs.modules.services
+import qs.modules.theme
 
 ShellRoot {
     FloatingWindow {
@@ -24,6 +27,10 @@ ShellRoot {
         Loader { id: bar; anchors.fill: parent }
         Component { id: island; IslandBar { screen: Quickshell.screens[0] } }
         Component { id: pills; PillsBar { screen: Quickshell.screens[0] } }
+        Process {
+            id: pinCommand
+            command: ["qs", "ipc", "-p", Quickshell.shellDir, "call", "nonchalant", "run", "bar-pin"]
+        }
         TestCase {
             name: "BarContextText"
             when: Config.initialLoadComplete
@@ -37,6 +44,26 @@ ShellRoot {
                 return null
             }
 
+            function verifyNoPinIcon(item) {
+                if (item.text !== undefined) {
+                    verify(item.text !== Icons.pin && item.text !== Icons.unpin,
+                        "Bar must not render a pin toggle")
+                }
+                for (const child of item.children ?? []) verifyNoPinIcon(child)
+            }
+
+            function test_pin_command() {
+                verify(GlobalShortcuts.ipcHandler !== null)
+                Config.bar.pinned = false
+                pinCommand.running = true
+                tryCompare(Config.bar, "pinned", true)
+                tryCompare(pinCommand, "running", false)
+                pinCommand.running = true
+                tryCompare(Config.bar, "pinned", false)
+                tryCompare(pinCommand, "running", false)
+                console.log("BAR_PIN_IPC_PASSED")
+            }
+
             function test_labels_data() {
                 return [{tag: "island", component: island}, {tag: "pills", component: pills}]
             }
@@ -45,6 +72,7 @@ ShellRoot {
                 Config.bar.pinned = true
                 bar.sourceComponent = data.component
                 tryVerify(() => bar.item !== null, 2000)
+                verifyNoPinIcon(bar.item)
                 const label = findLabel(bar.item)
                 verify(label !== null)
                 const rendered = label.children.find(child => child.truncated !== undefined)
@@ -100,11 +128,26 @@ ShellRoot {
 
 @unittest.skipUnless(shutil.which("qs"), "Quickshell is required for runtime checks")
 class BarTextRuntimeTests(unittest.TestCase):
-    def test_context_labels_fit_in_both_layouts(self):
+    def test_bar_labels_and_pin_command(self):
         with tempfile.TemporaryDirectory(prefix="nonchalant-bar-text-") as directory:
             fixture = Path(directory)
-            for name in ("modules", "config", "assets", "scripts", "version"):
+            for name in ("config", "assets", "scripts", "version"):
                 (fixture / name).symlink_to(ROOT / name, target_is_directory=(ROOT / name).is_dir())
+            # Isolate the command runner's FIFO from the live desktop session.
+            modules = fixture / "modules"
+            modules.mkdir()
+            for source in (ROOT / "modules").iterdir():
+                if source.name != "services":
+                    (modules / source.name).symlink_to(source, target_is_directory=source.is_dir())
+            services = modules / "services"
+            services.mkdir()
+            for source in (ROOT / "modules/services").iterdir():
+                target = services / source.name
+                if source.name == "GlobalShortcuts.qml":
+                    target.write_text(source.read_text().replace(
+                        '"/tmp/nonchalant_ipc.pipe"', '"' + str(fixture / "ipc.pipe") + '"'))
+                else:
+                    target.symlink_to(source, target_is_directory=source.is_dir())
             (fixture / "shell.qml").write_text(QML)
             home = fixture / "home"
             home.mkdir()
@@ -136,6 +179,7 @@ class BarTextRuntimeTests(unittest.TestCase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, output)
             self.assertIn("BAR_CONTEXT_TEXT_RUNTIME_FINISHED", output, output)
+            self.assertIn("BAR_PIN_IPC_PASSED", output, output)
             for layout in ("island", "pills"):
                 self.assertIn("BAR_CONTEXT_TEXT_PASSED_" + layout, output, output)
             self.assertNotIn("BAR_CONTEXT_TEXT_RUNTIME_TIMEOUT", output, output)

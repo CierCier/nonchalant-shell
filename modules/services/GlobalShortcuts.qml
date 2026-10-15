@@ -61,6 +61,9 @@ Singleton {
                 toggleAlerts();
                 break;
             case "dashboard": toggleDashboard(); break;
+            case "bar-pin":
+                Config.bar.pinned = !(Config.bar?.pinned ?? false);
+                break;
             case "sound":
             case "audio":
                 Visibilities.setActiveModule("sound");

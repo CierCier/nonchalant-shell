@@ -110,10 +110,6 @@ class TestPillsBarLayout(unittest.TestCase):
         self.assertIn("root.alertsCount", self.pills_content)
         self.assertIn('root.expand("alerts")', self.pills_content)
 
-        # 6. Pin Toggle Pill
-        self.assertIn("id: pinPill", self.pills_content)
-        self.assertIn("Config.bar.pinned", self.pills_content)
-
     def test_collapsed_pills_do_not_contain_default_bar_widgets(self):
         """Collapsed pills layer must not contain DefaultBar widgets (AudioFormatBadge, NetworkService, etc.)."""
         collapsed_marker = "COLLAPSED BAR STATE: SEPARATE FLOATING PILLS"

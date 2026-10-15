@@ -80,6 +80,10 @@ Mod+Shift+W hotkey-overlay-title="Open Wallpapers" { spawn "nonchalant" "run" "w
 
 ### Settings and lyrics
 
+Pin the Island or Pills bar from Shell settings, or bind
+`qs ipc call nonchalant run bar-pin` to toggle pinning. Pinning keeps the bar
+visible and reserves window space. The bar itself has no pin button.
+
 `nonchalant run settings` opens the redesigned settings window. Search settings,
 move between sections with back and forward history, and adjust colors with the
 built-in color picker. Existing Network, Bluetooth, Mixer, AI, theme, and system
