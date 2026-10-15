@@ -2,16 +2,24 @@
 # Script to list all monitors and their current brightness
 # Outputs format: MonitorName:Brightness
 
+set -euo pipefail
+
 # Check for internal displays using brightnessctl (backlight devices only)
 if command -v brightnessctl &> /dev/null; then
-    DEVICES=$(brightnessctl -l 2>/dev/null | grep "backlight" | awk -F"'" '{print $2}')
+    DEVICES=$(brightnessctl -l 2>/dev/null | grep "backlight" | awk -F"'" '{print $2}' || true)
     for device in $DEVICES; do
-        CURRENT=$(brightnessctl -d "$device" g 2>/dev/null)
-        MAX=$(brightnessctl -d "$device" m 2>/dev/null)
+        CURRENT=$(brightnessctl -d "$device" g 2>/dev/null || true)
+        MAX=$(brightnessctl -d "$device" m 2>/dev/null || true)
         if [ -n "$CURRENT" ] && [ -n "$MAX" ] && [ "$MAX" -gt 0 ]; then
             PERCENT=$(( CURRENT * 100 / MAX ))
-            # Match the internal backlight to Niri's eDP output.
-            MONITOR_NAME=$(niri msg -j outputs 2>/dev/null | jq -r 'keys[] | select(contains("eDP"))' | head -1)
+            MONITOR_NAME=""
+            for connector in /sys/class/drm/card*-eDP-* /sys/class/drm/card*-LVDS-*; do
+                if [ -f "$connector/status" ] && [ "$(cat "$connector/status")" = "connected" ]; then
+                    MONITOR_NAME="${connector##*/}"
+                    MONITOR_NAME="${MONITOR_NAME#card*-}"
+                    break
+                fi
+            done
             if [ -z "$MONITOR_NAME" ]; then
                 MONITOR_NAME="eDP-1"
             fi
@@ -32,12 +40,12 @@ if command -v ddcutil &> /dev/null; then
             CURRENT_CONNECTOR="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^$ ]] && [ -n "$CURRENT_BUS" ] && [ -n "$CURRENT_CONNECTOR" ]; then
             # End of display block, get brightness
-            BRIGHTNESS=$(ddcutil -b "$CURRENT_BUS" getvcp 10 --brief 2>/dev/null | awk '{print $4}')
+            BRIGHTNESS=$(ddcutil -b "$CURRENT_BUS" getvcp 10 --brief 2>/dev/null | awk '{print $4}' || true)
             if [ -n "$BRIGHTNESS" ]; then
                 echo "${CURRENT_CONNECTOR}:${BRIGHTNESS}"
             fi
             CURRENT_BUS=""
             CURRENT_CONNECTOR=""
         fi
-    done < <(ddcutil detect --brief 2>/dev/null; echo "")
+    done < <(ddcutil detect --brief 2>/dev/null || true; echo "")
 fi

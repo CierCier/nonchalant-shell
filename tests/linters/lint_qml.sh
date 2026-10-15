@@ -22,6 +22,14 @@ echo "Using QML Linter: $QMLLINT ($("$QMLLINT" --version 2>/dev/null || echo 'v1
 # Candidate files to lint
 CORE_FILES=(
     "shell.qml"
+    "modules/services/CompositorService.qml"
+    "modules/services/compositor/CompositorBackend.qml"
+    "modules/services/compositor/CompositorState.qml"
+    "modules/services/compositor/CompositorWindow.qml"
+    "modules/services/compositor/CompositorWorkspace.qml"
+    "modules/services/compositor/CompositorOutput.qml"
+    "modules/services/compositor/NiriBackend.qml"
+    "modules/services/compositor/hyprland/HyprlandBackend.qml"
     "config/Config.qml"
     "modules/bar/BarContent.qml"
     "modules/shell/ReservationWindows.qml"

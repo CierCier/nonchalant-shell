@@ -38,7 +38,8 @@ ActionGrid {
         {
             icon: Icons.logout,
             tooltip: "Log out",
-            command: "niri msg action quit --skip-confirmation"
+            command: "",
+            action: "logout"
         },
         {
             icon: Icons.reboot,
@@ -55,6 +56,8 @@ ActionGrid {
     onActionTriggered: action => {
         if (action.tooltip === "Lock Session")
             LockscreenService.lock();
+        if (action.action === "logout")
+            CompositorService.logout();
         root.itemSelected();
     }
 }

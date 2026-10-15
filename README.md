@@ -1,6 +1,6 @@
 # <img src="./assets/nonchalant/nonchalant-logo-color.svg" alt="" width="40" height="40"> Nonchalant Shell
 
-**Nonchalant Shell** is a Niri-first Wayland desktop shell built with
+**Nonchalant Shell** supports Niri and Hyprland and is built with
 [Quickshell](https://quickshell.org).
 
 ## Hard fork
@@ -24,7 +24,7 @@ Multi-monitor support uses Quickshell `Variants` on `Quickshell.screens`.
 
 ## Features
 
-- Runs directly on [Niri](https://github.com/YaLTeR/niri) via its JSON event stream
+- Runs on [Niri](https://github.com/niri-wm/niri) or [Hyprland](https://hypr.land) through a shared typed compositor service
 - Normalized monitor, workspace, and window state for multi-monitor setups
 - Unified bar with workspaces/taskbar, clock, system status, and systray
 - Floating run menu and power menu
@@ -32,6 +32,30 @@ Multi-monitor support uses Quickshell `Variants` on `Quickshell.screens`.
 - Searchable settings with section history, previews, and the existing configuration domains
 - Synchronized lyrics in the media players and lockscreen
 - Separate configuration, per-shell state, cache, data, and IPC paths
+
+## Compositor selection and testing
+
+The shell selects Niri or Hyprland from the session socket environment. If both
+are present, desktop identity resolves the session. Use
+`NONCHALANT_COMPOSITOR=niri` or `NONCHALANT_COMPOSITOR=hyprland` to select explicitly.
+Niri needs its `niri` executable; Hyprland uses the Quickshell native module.
+
+The Nix package pins Quickshell 0.3.2 and matching Qt libraries separately from
+the existing runtime tools. Test tools and disposable compositor sessions are
+available through Nix:
+
+```bash
+nix develop path:.#compositor-test --command ./tests/run_tests.sh --all
+nix develop path:.#compositor-test --command python3 tests/runtime/run_compositor.py --compositor niri --shell --style island
+nix develop path:.#compositor-test --command python3 tests/runtime/run_compositor.py --compositor hyprland --shell --style default
+```
+
+These runs use private displays and session paths. They leave your desktop
+running. The headless Hyprland test environment contains an Aquamarine nesting
+patch; your installed compositor and production shell package are unchanged by
+that test-only patch. See [compositor design](docs/compositor-design.md) and
+[support and verification](docs/compositor-support.md) for behavior differences
+and test limits.
 
 ## Showcase
 
@@ -141,7 +165,7 @@ separate upstream bug where Position can become zero after seeking.
 
 ## Run the development tree
 
-Install Quickshell and the runtime tools needed by the shell. Install fonts once,
+Install Quickshell 0.3.2 and the runtime tools needed by the shell. Install fonts once,
 then run from a checkout:
 
 ```bash

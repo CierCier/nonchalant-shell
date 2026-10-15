@@ -12,7 +12,7 @@ Singleton {
     id: root
 
     readonly property string appId: "nonchalant"
-    readonly property string ipcPipe: "/tmp/nonchalant_ipc.pipe"
+    readonly property string ipcPipe: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/nonchalant_ipc.pipe"
 
     // High-performance Pipe Listener (Daemon mode)
     Process {
@@ -201,15 +201,15 @@ Singleton {
         if (willOpen) {
             FocusGrabManager.clearTopGrab();
             const targetMonitor = screenName
-                ? NiriService.monitorFor(screenName)
-                : NiriService.focusedMonitor;
+                ? CompositorService.monitorFor(screenName)
+                : CompositorService.focusedMonitor;
             GlobalStates.settingsTargetWorkspaceId =
                 targetMonitor?.activeWorkspace?.id
-                || NiriService.focusedMonitor?.activeWorkspace?.id
-                || NiriService.focusedWorkspace?.id
-                || 0;
+                || CompositorService.focusedMonitor?.activeWorkspace?.id
+                || CompositorService.focusedWorkspace?.id
+                || "";
             GlobalStates.settingsTargetScreenName =
-                targetMonitor?.name || NiriService.focusedMonitor?.name || "";
+                targetMonitor?.name || CompositorService.focusedMonitor?.name || "";
             // Close bar popups / run menu under the settings window.
             Visibilities.closeActiveBarPopup();
             Visibilities.setActiveModule("");

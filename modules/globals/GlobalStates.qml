@@ -163,7 +163,7 @@ Singleton {
 
     // Settings Window state
     property bool settingsWindowVisible: false
-    property int settingsTargetWorkspaceId: 0
+    property string settingsTargetWorkspaceId: ""
     property string settingsTargetScreenName: ""
     property string settingsRequestedPageId: ""
     property string settingsRequestedTabId: ""
@@ -207,8 +207,8 @@ Singleton {
             assistantFocusRequested(true);
         } else {
             assistantVisible = true;
-            if (NiriService.focusedMonitor && NiriService.focusedMonitor.name) {
-                assistantScreenName = NiriService.focusedMonitor.name;
+            if (CompositorService.focusedMonitor && CompositorService.focusedMonitor.name) {
+                assistantScreenName = CompositorService.focusedMonitor.name;
             } else if (Quickshell.screens.length > 0) {
                 assistantScreenName = Quickshell.screens[0].name;
             }

@@ -73,10 +73,10 @@ Singleton {
     }
 
     function getForActive() {
-        if (!NiriService.focusedMonitor) {
+        if (!CompositorService.focusedMonitor) {
             return null;
         }
-        return getForScreen(NiriService.focusedMonitor.name);
+        return getForScreen(CompositorService.focusedMonitor.name);
     }
 
     // Helper to clone map and trigger update
@@ -119,7 +119,7 @@ Singleton {
     }
 
     function getIslandForActive() {
-        const focusedMonitor = NiriService.focusedMonitor;
+        const focusedMonitor = CompositorService.focusedMonitor;
         if (!focusedMonitor) {
             if (Quickshell.screens.length > 0)
                 return islands[Quickshell.screens[0].name] || null;
@@ -201,7 +201,7 @@ Singleton {
     }
 
     function getDashboardControllerForActive() {
-        const focusedMonitor = NiriService.focusedMonitor;
+        const focusedMonitor = CompositorService.focusedMonitor;
         if (!focusedMonitor)
             return null;
         return dashboardControllers[focusedMonitor.name] || null;
@@ -220,7 +220,7 @@ Singleton {
         if (toggleIslandMode("power"))
             return;
 
-        const focusedMonitor = NiriService.focusedMonitor;
+        const focusedMonitor = CompositorService.focusedMonitor;
         if (!focusedMonitor)
             return;
 
@@ -248,7 +248,7 @@ Singleton {
         if (toggleIslandMode("stats"))
             return;
 
-        const focusedMonitor = NiriService.focusedMonitor;
+        const focusedMonitor = CompositorService.focusedMonitor;
         if (!focusedMonitor)
             return;
 
@@ -291,8 +291,8 @@ Singleton {
         // Prefer niri's focused monitor; fall back to the first Quickshell screen
         // so modules still open when compositor focus is unavailable.
         let focusedScreenName = "";
-        if (NiriService.focusedMonitor && NiriService.focusedMonitor.name)
-            focusedScreenName = NiriService.focusedMonitor.name;
+        if (CompositorService.focusedMonitor && CompositorService.focusedMonitor.name)
+            focusedScreenName = CompositorService.focusedMonitor.name;
         else if (Quickshell.screens.length > 0)
             focusedScreenName = Quickshell.screens[0].name;
         else
@@ -313,7 +313,7 @@ Singleton {
     }
 
     function moveActiveModuleToFocusedScreen() {
-        const focusedMonitor = NiriService.focusedMonitor;
+        const focusedMonitor = CompositorService.focusedMonitor;
         if (!focusedMonitor || !currentActiveModule)
             return;
 
@@ -363,7 +363,7 @@ Singleton {
 
     // Monitor focus changes
     Connections {
-        target: NiriService
+        target: CompositorService
 
         property var lastFullscreenOutputs: []
 
@@ -373,7 +373,7 @@ Singleton {
 
         function onOverviewOpenChanged() {
             // Overview is a full compositor surface — dismiss shell chrome.
-            if (NiriService.overviewOpen) {
+            if (CompositorService.overviewOpen) {
                 closeActiveBarPopup();
                 clearAll();
                 currentActiveModule = "";
@@ -390,7 +390,7 @@ Singleton {
 
             // A fullscreen window covers the Overlay-layer panel — dismiss shell
             // chrome, but only when a screen newly enters fullscreen.
-            const outputs = NiriService.fullscreenOutputs;
+            const outputs = CompositorService.fullscreenOutputs;
             const newlyFullscreen = outputs.some(name => lastFullscreenOutputs.indexOf(name) === -1);
             lastFullscreenOutputs = outputs.slice();
             if (newlyFullscreen) {

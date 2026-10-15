@@ -24,7 +24,7 @@ Item {
     property int selectedScreenIndex: 0
     readonly property var allScreens: Quickshell.screens
     readonly property ShellScreen targetScreen: (allScreens && allScreens.length > 0) ? allScreens[selectedScreenIndex % allScreens.length] : root.screen
-    readonly property string currentScreenName: targetScreen?.name ?? (root.screen?.name ?? (NiriService.focusedMonitor ? NiriService.focusedMonitor.name : ""))
+    readonly property string currentScreenName: targetScreen?.name ?? (root.screen?.name ?? (CompositorService.focusedMonitor ? CompositorService.focusedMonitor.name : ""))
 
     property bool isPerScreen: {
         if (!GlobalStates.wallpaperManager || currentScreenName === "") return false;

@@ -12,6 +12,7 @@ import qs.modules.bar.audioformat
 import qs.modules.bar.workspaces
 import qs.modules.components
 import qs.modules.services
+import qs.modules.services.compositor
 import qs.modules.globals
 import qs.modules.theme
 import qs.modules.widgets.launcher
@@ -147,54 +148,10 @@ Item {
         }
     }
 
-    function isWindowTouchingTop(win): bool {
-        if (!win)
-            return false;
-        if (win.floating) {
-            const y = (win.at && win.at.length > 1) ? Number(win.at[1]) : 0;
-            const h = (win.size && win.size.length > 1) ? Number(win.size[1]) : 0;
-            return (y + h > 0) && (y <= (root.islandHeight + 8));
-        }
-        // Tiled windows in Niri attach to the top of the workspace view
-        return true;
-    }
-
-    readonly property var activeWorkspace: {
-        const list = NiriService.workspaces.values;
-        if (list && list.length > 0) {
-            for (let i = 0; i < list.length; i++) {
-                const ws = list[i];
-                if (ws && (ws.output === root.screen.name || (!ws.output && Quickshell.screens.length <= 1)) && ws.active)
-                    return ws;
-            }
-        }
-        if (NiriService.focusedWorkspace && (NiriService.focusedWorkspace.output === root.screen.name || Quickshell.screens.length <= 1))
-            return NiriService.focusedWorkspace;
-        return null;
-    }
-
-    readonly property int activeWorkspaceWindows: {
-        if (!activeWorkspace)
-            return 0;
-        return NiriService.windowsForWorkspace(activeWorkspace.id).length;
-    }
+    readonly property CompositorWorkspace activeWorkspace: CompositorService.activeWorkspaceForOutput(root.screen.name)
+    readonly property int activeWorkspaceWindows: activeWorkspace?.windows ?? 0
     readonly property bool hasActiveWindows: activeWorkspaceWindows > 0
-    readonly property bool hasWindowTouchingTop: {
-        const ws = root.activeWorkspace;
-        if (ws) {
-            const windows = NiriService.windowsForWorkspace(ws.id);
-            if (windows && windows.length > 0) {
-                for (let i = 0; i < windows.length; i++) {
-                    if (isWindowTouchingTop(windows[i]))
-                        return true;
-                }
-                return false;
-            }
-        }
-        if (root.screenFocusedClient && isWindowTouchingTop(root.screenFocusedClient))
-            return true;
-        return false;
-    }
+    readonly property bool hasWindowTouchingTop: CompositorService.hasWindowAtTop(root.screen.name, root.islandHeight + 8)
     readonly property bool hasNotifications: !Notifications.silent && Notifications.popupList && Notifications.popupList.length > 0
 
     onHasNotificationsChanged: {
@@ -252,18 +209,7 @@ Item {
         return count;
     }
 
-    readonly property var screenFocusedClient: {
-        if (NiriService.focusedClient && (NiriService.focusedClient.output === root.screen.name || NiriService.focusedClient.monitor === root.screen.name))
-            return NiriService.focusedClient;
-        if (root.activeWorkspace && root.activeWorkspace.activeWindowId !== null) {
-            const list = NiriService.clients.values;
-            if (list) {
-                const found = list.find(c => Number(c.id) === Number(root.activeWorkspace.activeWindowId));
-                if (found) return found;
-            }
-        }
-        return null;
-    }
+    readonly property CompositorWindow screenFocusedClient: CompositorService.activeWindowForOutput(root.screen.name)
 
     readonly property bool isMediaPlaying: MprisController.isPlaying && MprisController.activePlayer !== null
     readonly property string contextLabel: {
@@ -277,7 +223,7 @@ Item {
     property bool debounceActive: false
     readonly property bool isPinned: Config.bar?.pinned ?? false
 
-    readonly property bool barAlwaysVisible: !NiriService.overviewOpen && (root.isPinned || !hasWindowTouchingTop)
+    readonly property bool barAlwaysVisible: !CompositorService.overviewOpen && (root.isPinned || !hasWindowTouchingTop)
     readonly property bool barNormallyVisible: barAlwaysVisible || isHovered || debounceActive
 
     readonly property bool shouldBeRevealed: {

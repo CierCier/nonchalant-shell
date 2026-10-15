@@ -7,6 +7,7 @@ import Quickshell.Widgets
 import qs.config
 import qs.modules.components
 import qs.modules.services
+import qs.modules.services.compositor
 import qs.modules.theme
 
 Item {
@@ -16,7 +17,7 @@ Item {
     // The island embeds the switcher on its own surface, so it hides this.
     property bool showBackground: true
 
-    readonly property var visibleWorkspaces: NiriService.workspacesForOutput(root.bar.screen.name)
+    readonly property list<CompositorWorkspace> visibleWorkspaces: CompositorService.workspacesForOutput(root.bar.screen.name)
     readonly property int activeWorkspaceIndex: visibleWorkspaces.findIndex(workspace => workspace.active)
     readonly property Item activeWorkspaceButton: {
         const count = workspaceRepeater.count;
@@ -95,10 +96,10 @@ Item {
             Item {
                 id: workspaceButton
 
-                required property var modelData
-                readonly property var workspace: modelData
+                required property CompositorWorkspace modelData
+                readonly property CompositorWorkspace workspace: modelData
                 readonly property bool active: workspace.active
-                readonly property var windows: NiriService.windowsForWorkspace(workspace.id)
+                readonly property list<CompositorWindow> windows: CompositorService.windowsForWorkspace(workspace.id)
                 readonly property bool occupied: windows.length > 0
                 readonly property string displayName: workspace.isNamed ? workspace.name : String(workspace.idx)
                 readonly property bool showLabel: !active || !occupied
@@ -190,7 +191,7 @@ Item {
                             id: appButton
 
                             required property var modelData
-                            readonly property var windowData: modelData
+                            readonly property CompositorWindow windowData: modelData
                             readonly property string iconName: root.iconForWindow(windowData)
 
                             width: 24
@@ -276,7 +277,7 @@ Item {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: mouse => {
                                     mouse.accepted = true;
-                                    NiriService.focusWindow(appButton.windowData.id);
+                                    CompositorService.focusWindow(appButton.windowData.id);
                                 }
                             }
 
@@ -294,7 +295,7 @@ Item {
                     z: 1
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: NiriService.focusWorkspace(workspaceButton.workspace.id)
+                    onClicked: CompositorService.focusWorkspace(workspaceButton.workspace.id)
                 }
             }
         }
@@ -303,9 +304,9 @@ Item {
     WheelHandler {
         onWheel: event => {
             if (event.angleDelta.y < 0)
-                NiriService.runNiriAction(["focus-workspace-down"]);
+                CompositorService.focusAdjacentWorkspace(root.bar.screen.name, 1);
             else if (event.angleDelta.y > 0)
-                NiriService.runNiriAction(["focus-workspace-up"]);
+                CompositorService.focusAdjacentWorkspace(root.bar.screen.name, -1);
         }
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     }

@@ -50,11 +50,10 @@ if [[ $scheme == scheme-wallpaper ]]; then
   exit 0
 fi
 
-# matugen 4.x refuses to pick a source color without a TTY unless --prefer
-# or --source-color-index is set. Quickshell Process has no TTY, so we must
-# pass a non-interactive preference or generation silently fails and the shell
-# stays on a stale near-black palette.
-prefer=${MATUGEN_PREFER:-saturation}
+# Matugen flag names vary by release; only pass supported source preferences.
+matugen_supports() {
+  matugen image --help 2>/dev/null | grep -qw -- "$1"
+}
 
 if command -v matugen >/dev/null 2>&1; then
   # Give each invocation its own output; an old shared cache is never success.
@@ -74,12 +73,16 @@ Path(sys.argv[2]).write_text(text)
 PY
   args=(
     matugen image "$image_path"
-    --prefer "$prefer"
-    --source-color-index 0
     -c "$staging_dir/config.toml"
     -t "$scheme"
     -m "$mode"
   )
+  if matugen_supports --prefer; then
+    args+=(--prefer "${MATUGEN_PREFER:-saturation}")
+  fi
+  if matugen_supports --source-color-index; then
+    args+=(--source-color-index 0)
+  fi
   if "${args[@]}" && validate_palette; then
     mv -- "$temporary_path" "$output_path"
     exit 0

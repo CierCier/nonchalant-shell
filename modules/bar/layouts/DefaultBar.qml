@@ -15,8 +15,8 @@ Item {
 
     required property ShellScreen screen
 
-    readonly property bool fullscreenOnScreen: NiriService.fullscreenOutputs.indexOf(root.screen.name) !== -1
-    readonly property bool reveal: !NiriService.overviewOpen && !fullscreenOnScreen
+    readonly property bool fullscreenOnScreen: CompositorService.fullscreenOutputs.indexOf(root.screen.name) !== -1
+    readonly property bool reveal: !CompositorService.overviewOpen && !fullscreenOnScreen
     readonly property bool bottomPosition: (Config.bar?.position ?? "top") === "bottom"
 
     readonly property real outerRadius: Styling.radius(0)
