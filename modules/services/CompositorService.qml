@@ -95,29 +95,55 @@ Singleton {
     }
 
     function focusWorkspace(id: string): bool {
-        return workspaceById(id) !== null && submit("focusWorkspace", id, [id]);
+        if (workspaceById(id) === null) {
+        root.actionFailed("focusWorkspace", id, "Workspace no longer exists");
+        return false;
+    }
+    return submit("focusWorkspace", id, [id]);
     }
 
     function focusWindow(id: string): bool {
-        return windowById(id) !== null && submit("focusWindow", id, [id]);
+        if (windowById(id) === null) {
+        root.actionFailed("focusWindow", id, "Window no longer exists");
+        return false;
+    }
+    return submit("focusWindow", id, [id]);
     }
 
     function closeWindow(id: string): bool {
-        return windowById(id) !== null && submit("closeWindow", id, [id]);
+        if (windowById(id) === null) {
+        root.actionFailed("closeWindow", id, "Window no longer exists");
+        return false;
+    }
+    return submit("closeWindow", id, [id]);
     }
 
     function moveWindowToWorkspace(windowId: string, workspaceId: string, followFocus: bool): bool {
-        return windowById(windowId) !== null && workspaceById(workspaceId) !== null
-            && submit("moveWindowToWorkspace", windowId, [windowId, workspaceId, followFocus]);
+        if (windowById(windowId) === null) {
+            root.actionFailed("moveWindowToWorkspace", windowId, "Window no longer exists");
+            return false;
+        }
+        if (workspaceById(workspaceId) === null) {
+            root.actionFailed("moveWindowToWorkspace", windowId, "Workspace no longer exists");
+            return false;
+        }
+        return submit("moveWindowToWorkspace", windowId, [windowId, workspaceId, followFocus]);
     }
 
     function focusMonitor(name: string): bool {
-        return monitorFor(name) !== null && submit("focusMonitor", name, [name]);
+        if (monitorFor(name) === null) {
+        root.actionFailed("focusMonitor", name, "Output no longer exists");
+        return false;
+    }
+    return submit("focusMonitor", name, [name]);
     }
 
     function focusAdjacentWorkspace(output: string, direction: int): bool {
-        return direction !== 0 && monitorFor(output) !== null
-            && submit("focusAdjacentWorkspace", output, [output, direction]);
+        if (direction === 0 || monitorFor(output) === null) {
+            root.actionFailed("focusAdjacentWorkspace", output, "Output no longer exists");
+            return false;
+        }
+        return submit("focusAdjacentWorkspace", output, [output, direction]);
     }
 
     function logout(): bool {

@@ -79,8 +79,7 @@ PY
   )
   if matugen_supports --prefer; then
     args+=(--prefer "${MATUGEN_PREFER:-saturation}")
-  fi
-  if matugen_supports --source-color-index; then
+  elif matugen_supports --source-color-index; then
     args+=(--source-color-index 0)
   fi
   if "${args[@]}" && validate_palette; then

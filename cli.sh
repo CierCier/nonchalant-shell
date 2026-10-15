@@ -134,7 +134,11 @@ refresh)
 	;;
 run)
 	CMD="${2:-}"
-	PIPE="${XDG_RUNTIME_DIR:-/tmp}/nonchalant_ipc.pipe"
+	if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+		PIPE="$XDG_RUNTIME_DIR/nonchalant_ipc.pipe"
+	else
+		PIPE="/tmp/nonchalant_ipc_${WAYLAND_DISPLAY:-default}.pipe"
+	fi
 
 
 	if [ -z "$CMD" ]; then

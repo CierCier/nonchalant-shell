@@ -12,12 +12,14 @@ Singleton {
     id: root
 
     readonly property string appId: "nonchalant"
-    readonly property string ipcPipe: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/nonchalant_ipc.pipe"
+    // XDG_RUNTIME_DIR is already session-private. Only the /tmp fallback
+    // needs a session key so concurrent sessions do not share one FIFO.
+    readonly property string ipcPipe: Quickshell.env("XDG_RUNTIME_DIR") ? Quickshell.env("XDG_RUNTIME_DIR") + "/nonchalant_ipc.pipe" : "/tmp/nonchalant_ipc_" + (Quickshell.env("WAYLAND_DISPLAY") || "default") + ".pipe"
 
     // High-performance Pipe Listener (Daemon mode)
     Process {
         id: pipeListener
-        command: ["bash", "-c", "rm -f " + root.ipcPipe + "; mkfifo " + root.ipcPipe + "; tail -f " + root.ipcPipe]
+        command: ["bash", "-c", "rm -f \"$1\"; mkfifo \"$1\"; tail -f \"$1\"", "nonchalant-ipc-listener", root.ipcPipe]
         running: true
         
         stdout: SplitParser {

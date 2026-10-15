@@ -53,8 +53,7 @@ nix develop path:.#compositor-test --command python3 tests/runtime/run_composito
 These runs use private displays and session paths. They leave your desktop
 running. The headless Hyprland test environment contains an Aquamarine nesting
 patch; your installed compositor and production shell package are unchanged by
-that test-only patch. See [compositor design](docs/compositor-design.md) and
-[support and verification](docs/compositor-support.md) for behavior differences
+that test-only patch. See [compositor design](docs/compositor-design.md) for behavior differences
 and test limits.
 
 ## Showcase

@@ -310,18 +310,21 @@ def main():
                    "--quickshell", args.quickshell]
         command.extend(flag for flag, enabled in (("--shell", args.shell),
             ("--baseline", args.baseline), ("--power-cycle", args.power_cycle)) if enabled)
-        result = subprocess.run(command, env=env)
         runtime = Path(env["XDG_RUNTIME_DIR"])
-        (root / "runtime").unlink()
-        shutil.copytree(runtime, root / "runtime", ignore=lambda directory, names: [
-            name for name in names if (Path(directory) / name).is_socket()
-            or (Path(directory) / name).is_fifo()])
-        shutil.rmtree(runtime)
+        try:
+            result = subprocess.run(command, env=env)
+        finally:
+            (root / "runtime").unlink()
+            shutil.copytree(runtime, root / "runtime", ignore=lambda directory, names: [
+                name for name in names if (Path(directory) / name).is_socket()
+                or (Path(directory) / name).is_fifo()])
+            shutil.rmtree(runtime, ignore_errors=True)
         print(f"Artifacts: {root}")
         return result.returncode
     session = Session(args.inside_session, args.quickshell)
     result = {"compositor": args.compositor, "style": args.style,
               "source": str(args.source), "passed": []}
+    exit_code = 1
     try:
         start_compositor(session, args.compositor)
         session.env["NONCHALANT_COMPOSITOR"] = args.compositor
@@ -335,11 +338,11 @@ def main():
             result["passed"].append("standalone monitor power off/on reaches disposable compositor")
         exercise(session, args.source, args, result["passed"])
         print(json.dumps(result, indent=2))
-        return 0
+        exit_code = 0
     except (RuntimeError, AssertionError, subprocess.TimeoutExpired) as error:
         result["error"] = str(error)
         print(json.dumps(result, indent=2), file=sys.stderr)
-        return 1
+        exit_code = 1
     finally:
         if hasattr(session, "power_script"):
             try:
@@ -392,6 +395,14 @@ def main():
                 "missingTools": sum("Process failed to start" in line for line in lines)
             }
         (session.root / "result.json").write_text(json.dumps(result, indent=2))
+        broken = sum(counts["qmlErrors"] + counts["bindingOrTypeWarnings"]
+                     for counts in result["runtimeDiagnosticCounts"].values())
+        if broken:
+            result["error"] = result.get("error") or (
+                f"{broken} QML errors or binding failures in runtime logs")
+            (session.root / "result.json").write_text(json.dumps(result, indent=2))
+            return 1
+        return exit_code
 
 
 if __name__ == "__main__":

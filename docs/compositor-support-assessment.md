@@ -1,6 +1,6 @@
 # Niri and Hyprland support assessment
 
-Baseline assessed 2026-10-14, before implementation. See [the current design](compositor-design.md) and [verification status](compositor-support.md). This is the original implementation proposal based on source inspection and current upstream documentation. Runtime code and dependencies have not been changed.
+Baseline assessed 2026-10-14, before implementation. See [the current design](compositor-design.md). This is the original implementation proposal based on source inspection and current upstream documentation. Runtime code and dependencies have not been changed.
 
 Hyprland support is feasible with a shared compositor service and two backends. The current shell requires Niri for meaningful window/workspace state and several desktop actions. Updating Quickshell alone will not remove that requirement.
 
