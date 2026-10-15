@@ -191,6 +191,7 @@ Item {
             root.targetCardWidth = targetW;
             root.targetCardHeight = targetH;
             root.targetCardRadius = root.panelRadius;
+            root.animateReveal(0);
         } else {
             // Step 1: Snap card to exact position of the source pill (with Behaviors disabled)
             root.snapGeometry = true;
@@ -1467,7 +1468,8 @@ Item {
                         width: parent.width
 
                         onDismissRequested: {
-                            root.collapse();
+                            if (root.currentMode === "notification")
+                                root.collapse();
                         }
                     }
                 }

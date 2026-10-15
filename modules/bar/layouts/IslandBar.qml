@@ -585,8 +585,7 @@ Item {
         } else if (currentMode === "collapsed" && root.hasNotifications) {
             Qt.callLater(() => {
                 if (root.currentMode === "collapsed" && root.hasNotifications) {
-                    root.openedFromHidden = !root.barAlwaysVisible;
-                    root.currentMode = "notification";
+                    root.expand("notification");
                 }
             });
         }
@@ -1203,7 +1202,8 @@ Item {
                         width: parent.width
 
                         onDismissRequested: {
-                            root.collapse();
+                            if (root.currentMode === "notification")
+                                root.collapse();
                         }
                     }
                 }

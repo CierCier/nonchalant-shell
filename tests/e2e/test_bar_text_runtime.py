@@ -1,4 +1,4 @@
-"""Check bar labels, absent pin controls, and pin IPC without touching the session."""
+"""Check bar rendering and transitions without touching the desktop session."""
 
 import os
 from pathlib import Path
@@ -64,6 +64,120 @@ ShellRoot {
                 console.log("BAR_PIN_IPC_PASSED")
             }
 
+            function cleanup() {
+                bar.sourceComponent = undefined
+                Notifications.dismissAllPopups()
+                Notifications.silent = false
+                NiriService.workspaces.values = []
+                NiriService.clients.values = []
+            }
+
+            function test_notifications_data() {
+                const rows = []
+                for (const layout of [{name: "island", component: island}, {name: "pills", component: pills}]) {
+                    for (const pinned of [false, true]) {
+                        for (const duration of [0, 100]) {
+                            rows.push({tag: layout.name + "-" + pinned + "-" + duration,
+                                component: layout.component, pinned: pinned, duration: duration})
+                        }
+                    }
+                }
+                return rows
+            }
+
+            function test_notifications(data) {
+                Config.bar.pinned = data.pinned
+                Config.theme.animDuration = data.duration
+                NiriService.workspaces.values = [{id: 1, active: true, output: Quickshell.screens[0].name}]
+                NiriService.clients.values = [{id: 1, workspace: {id: 1}, floating: false}]
+                bar.sourceComponent = data.component
+                tryVerify(() => bar.item !== null)
+                const panel = bar.item
+                compare(panel.hasWindowTouchingTop, true)
+                panel.expand("calendar")
+                tryCompare(panel, "containerY", 0)
+                const notification = Notifications.notifyInternal({appName: "Bar regression",
+                    summary: "Network disconnected", body: "The network connection has been disconnected",
+                    expireTimeout: 60000})
+                tryCompare(panel, "hasNotifications", true)
+                compare(panel.currentMode, "calendar")
+                panel.collapse()
+                tryCompare(panel, "currentMode", "notification")
+                tryCompare(panel, "containerY", 0, 1500)
+                compare(panel.retractingToHidden, false)
+                compare(panel.revealProgress, 1)
+                Notifications.timeoutNotification(notification.id)
+                tryCompare(panel, "currentMode", "collapsed")
+                tryCompare(panel, "retractingToHidden", false)
+                tryCompare(panel, "revealProgress", data.pinned ? 1 : 0)
+
+                const background = Notifications.notifyInternal({summary: "Expires behind a panel", expireTimeout: 60000})
+                tryCompare(panel, "currentMode", "notification")
+                panel.expand("calendar")
+                tryCompare(panel, "containerY", 0)
+                Notifications.clearPopupById(background.id)
+                tryCompare(panel, "hasNotifications", false)
+                wait(Motion.collapseDuration + 100)
+                compare(panel.currentMode, "calendar", "An expired notification must not close another panel")
+                compare(panel.containerY, 0)
+                panel.collapse()
+                tryCompare(panel, "currentMode", "collapsed")
+
+                Notifications.notifyInternal({summary: "Dismiss through DND", expireTimeout: 60000})
+                tryCompare(panel, "currentMode", "notification")
+                Notifications.setSilent(true)
+                tryCompare(panel, "currentMode", "collapsed")
+                tryCompare(panel, "retractingToHidden", false)
+                tryCompare(panel, "revealProgress", data.pinned ? 1 : 0)
+                console.log("BAR_NOTIFICATION_PASSED_" + data.tag)
+            }
+
+            function test_interrupted_retraction_data() {
+                return [{tag: "island", component: island}, {tag: "pills", component: pills}]
+            }
+
+            function test_interrupted_retraction(data) {
+                Config.bar.pinned = false
+                Config.theme.animDuration = 100
+                NiriService.workspaces.values = [{id: 1, active: true, output: Quickshell.screens[0].name}]
+                NiriService.clients.values = [{id: 1, workspace: {id: 1}, floating: false}]
+                bar.sourceComponent = data.component
+                tryVerify(() => bar.item !== null)
+                const panel = bar.item
+                compare(panel.hasWindowTouchingTop, true)
+                for (const interrupt of ["notification", "panel", "osd", "pin", "workspace"]) {
+                    panel.expand(interrupt === "osd" ? "osd" : "calendar")
+                    tryCompare(panel, "containerY", 0)
+                    panel.collapse()
+                    wait(80)
+                    compare(panel.retractingToHidden, true)
+                    verify(panel.containerY < 0)
+                    if (interrupt === "notification") {
+                        Notifications.notifyInternal({summary: "Arrived while closing", expireTimeout: 60000})
+                    } else if (interrupt === "panel") {
+                        panel.expand("sound")
+                    } else if (interrupt === "osd") {
+                        panel.triggerOsd("mic", 0.5, false)
+                    } else if (interrupt === "pin") {
+                        Config.bar.pinned = true
+                    } else {
+                        NiriService.clients.values = []
+                    }
+                    tryCompare(panel, "containerY", 0, 1500)
+                    compare(panel.retractingToHidden, false)
+                    wait(Motion.collapseDuration + 100)
+                    compare(panel.containerY, 0, "A stale close must not hide " + interrupt)
+                    Notifications.dismissAllPopups()
+                    panel.collapse()
+                    Config.bar.pinned = false
+                    NiriService.clients.values = [{id: 1, workspace: {id: 1}, floating: false}]
+                    tryCompare(panel, "currentMode", "collapsed")
+                    tryCompare(panel, "retractingToHidden", false)
+                    tryCompare(panel, "revealProgress", 0)
+                }
+                console.log("BAR_INTERRUPTED_RETRACTION_PASSED_" + data.tag)
+            }
+
             function test_labels_data() {
                 return [{tag: "island", component: island}, {tag: "pills", component: pills}]
             }
@@ -118,7 +232,7 @@ ShellRoot {
         }
     }
     Timer {
-        interval: 20000
+        interval: 60000
         running: true
         onTriggered: { console.error("BAR_CONTEXT_TEXT_RUNTIME_TIMEOUT"); Qt.quit() }
     }
@@ -174,7 +288,7 @@ class BarTextRuntimeTests(unittest.TestCase):
             env.pop("WAYLAND_DISPLAY", None)
             result = subprocess.run(
                 ["qs", "-p", str(fixture), "--no-duplicate", "--no-color"],
-                env=env, capture_output=True, text=True, timeout=25,
+                env=env, capture_output=True, text=True, timeout=65,
             )
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, output)
@@ -182,6 +296,11 @@ class BarTextRuntimeTests(unittest.TestCase):
             self.assertIn("BAR_PIN_IPC_PASSED", output, output)
             for layout in ("island", "pills"):
                 self.assertIn("BAR_CONTEXT_TEXT_PASSED_" + layout, output, output)
+                self.assertIn("BAR_INTERRUPTED_RETRACTION_PASSED_" + layout, output, output)
+                for pinned in ("false", "true"):
+                    for duration in (0, 100):
+                        marker = f"BAR_NOTIFICATION_PASSED_{layout}-{pinned}-{duration}"
+                        self.assertIn(marker, output, output)
             self.assertNotIn("BAR_CONTEXT_TEXT_RUNTIME_TIMEOUT", output, output)
             self.assertNotIn("FAIL!", output, output)
             self.assertNotIn("Binding loop", output, output)
