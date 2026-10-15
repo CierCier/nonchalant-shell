@@ -23,6 +23,7 @@ import qs.modules.globals
 import qs.modules.services
 import qs.modules.components
 import qs.modules.bar.island
+import qs.modules.bar.layouts
 import qs.modules.widgets.dashboard.widgets
 
 ShellRoot {
@@ -37,6 +38,8 @@ ShellRoot {
         IslandMediaCenterPanel { id: center; width: 420; height: implicitHeight; x: 500 }
         IslandMediaCard { id: card; width: 420; height: implicitHeight; x: 500; y: 500 }
         Process { id: control }
+        Loader { id: barLoader; anchors.fill: parent }
+        Component { id: pillsComponent; PillsBar { screen: Quickshell.screens[0] } }
         TestCase {
             name: "MprisDurationRuntime"
             when: Config.initialLoadComplete && MprisController.activePlayer !== null
@@ -66,6 +69,28 @@ ShellRoot {
                 tryVerify(() => Math.abs(lockSlider.value - expected) < 0.001, 1000,
                     "Lock player progress must follow position and duration while paused")
                 verify(Math.abs(waveform.progress - expected) < 0.001)
+            }
+
+            function test_pills_playback_label_reserves_visualizer_width() {
+                Config.bar.pinned = true
+                update("SetPlayback", "Playing")
+                tryCompare(MprisController, "isPlaying", true)
+                barLoader.sourceComponent = pillsComponent
+                tryVerify(() => barLoader.item !== null)
+                compare(barLoader.item.isMediaPlaying, true)
+                const label = controlOfType(barLoader.item, "FluidTextProgress")
+                verify(label !== null)
+                const rendered = label.children.find(child => child.truncated !== undefined)
+                verify(rendered !== undefined)
+                label.text = "Desktop"
+                tryVerify(() => label.width >= rendered.implicitWidth)
+                compare(rendered.truncated, false, "Playing titles must fit beside the actual visualizer")
+                label.text = "A very long playing media title that must still elide at the maximum pill width"
+                tryCompare(rendered, "truncated", true)
+                barLoader.sourceComponent = undefined
+                update("SetPlayback", "Paused")
+                update("MovePosition", 94)
+                console.log("PILLS_PLAYING_LABEL_PASSED")
             }
             function test_unknown_and_late_duration() {
                 const player = MprisController.activePlayer
@@ -421,6 +446,7 @@ print(json.dumps({'id': video_id, 'duration': 444 if video_id == 'slowtrack01' e
             self.assertEqual(result.returncode, 0, output)
             self.assertIn("MPRIS_DURATION_RUNTIME_PASSED", output, output)
             self.assertIn("LOCKSCREEN_CURRENT_LYRIC_RUNTIME_PASSED", output, output)
+            self.assertIn("PILLS_PLAYING_LABEL_PASSED", output, output)
             self.assertNotIn("MPRIS_DURATION_RUNTIME_TIMEOUT", output, output)
             self.assertNotIn("Binding loop", output, output)
             canceled_pid = home / ".local/state/slow-extractor.pid"

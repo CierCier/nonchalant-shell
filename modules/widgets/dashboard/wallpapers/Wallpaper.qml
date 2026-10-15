@@ -445,7 +445,7 @@ PanelWindow {
         }
     }
 
-    // Re-run matugen for the current wallpaper with a Material scheme type.
+    // Select the extractor and clear any static preset before regenerating.
     function setMatugenScheme(scheme) {
         wallpaperConfig.adapter.matugenScheme = scheme;
 
@@ -476,6 +476,8 @@ PanelWindow {
     }
 
     function runMatugenForCurrentWallpaper() {
+        if (GlobalStates.wallpaperManager !== wallpaper)
+            return;
         // Prefer the adapter value — the bound property can lag one tick after
         // clearing a preset when switching back to a matugen scheme.
         var preset = wallpaperConfig.adapter.activeColorPreset || "";
@@ -507,7 +509,7 @@ PanelWindow {
                 "bash",
                 decodeURIComponent(Qt.resolvedUrl("../../../../scripts/generate_wallpaper_colors.sh").toString().replace("file://", "")),
                 matugenSource,
-                wallpaperConfig.adapter.matugenScheme || "scheme-tonal-spot",
+                wallpaperConfig.adapter.matugenScheme || "scheme-wallpaper",
                 Config.theme.lightMode ? "light" : "dark",
                 decodeURIComponent(Qt.resolvedUrl("../../../../assets/matugen/config.toml").toString().replace("file://", "")),
                 Quickshell.env("HOME") + "/.cache/nonchalant/colors.json"
@@ -779,7 +781,7 @@ PanelWindow {
         onAdapterUpdated: {
             // Ensure matugenScheme has a default value
             if (!wallpaperConfig.adapter.matugenScheme) {
-                wallpaperConfig.adapter.matugenScheme = "scheme-tonal-spot";
+                wallpaperConfig.adapter.matugenScheme = "scheme-wallpaper";
             }
             if (supportedWallpaperModes.indexOf(wallpaperConfig.adapter.wallpaperMode) === -1) {
                 wallpaperConfig.adapter.wallpaperMode = "crop";
@@ -795,7 +797,7 @@ PanelWindow {
             id: wallpaperAdapter
             property string currentWall: ""
             property string wallPath: ""
-            property string matugenScheme: "scheme-tonal-spot"
+            property string matugenScheme: "scheme-wallpaper"
             property string activeColorPreset: ""
             property bool tintEnabled: false
             property string wallpaperMode: "crop"

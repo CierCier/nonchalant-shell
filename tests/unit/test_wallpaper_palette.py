@@ -55,6 +55,35 @@ class WallpaperPaletteTests(unittest.TestCase):
             for second in accents[index + 1:]:
                 self.assertGreater(hue_distance(first, second), 25)
 
+    @unittest.skipUnless(shutil.which("node"), "node unavailable")
+    def test_wallpaper_command_selects_extractor_and_clears_preset(self):
+        shortcuts = (ROOT / "modules/services/GlobalShortcuts.qml").read_text()
+        manager = (ROOT / "modules/widgets/dashboard/wallpapers/Wallpaper.qml").read_text()
+        command = re.search(r"function run\(command\) \{(.*?)\n    \}", shortcuts, re.S)
+        scheme = re.search(r"function setMatugenScheme\(scheme\) \{(.*?)\n    \}", manager, re.S)
+        self.assertIsNotNone(command)
+        self.assertIsNotNone(scheme)
+        result = subprocess.run(
+            ["node", "-e", """
+const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const config = {adapter: {matugenScheme: 'scheme-tonal-spot', activeColorPreset: 'Preset'}};
+let generations = 0;
+const quiet = {log() {}};
+const setScheme = new Function('scheme', 'wallpaperConfig', 'Qt', 'runMatugenForCurrentWallpaper', 'console', data.scheme);
+const manager = {setMatugenScheme(value) {
+    setScheme(value, config, {callLater(callback) {callback()}}, () => generations++, quiet);
+}};
+const run = new Function('command', 'GlobalStates', 'console', data.command);
+run('wallpaper-colors', {wallpaperManager: manager}, quiet);
+console.log(JSON.stringify({adapter: config.adapter, generations}));
+"""],
+            input=json.dumps({"command": command.group(1), "scheme": scheme.group(1)}),
+            capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(result.stdout), {
+            "adapter": {"matugenScheme": "scheme-wallpaper", "activeColorPreset": ""},
+            "generations": 1,
+        })
+
     def test_small_accents_survive_large_gray_regions(self):
         image = Image.new("RGB", (200, 200), "#666666")
         draw = ImageDraw.Draw(image)
@@ -195,6 +224,7 @@ class WallpaperPaletteTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("primary", json.loads((self.root / "colors.json").read_text()))
         self.assertFalse((self.root / ".cache/nonchalant/colors.json").exists())
+        self.assertNotIn("trying wallust", result.stderr)
 
     def test_success_without_output_cannot_reuse_stale_palette(self):
         self.stripes(["#cd7840", "#36a89c", "#82b44b"])

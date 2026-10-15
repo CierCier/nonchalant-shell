@@ -90,19 +90,6 @@ Rectangle {
         return details.join(" · ");
     }
 
-    function gpuColor(vendor) {
-        switch ((vendor || "").toLowerCase()) {
-        case "nvidia":
-            return Colors.green;
-        case "amd":
-            return Colors.red;
-        case "intel":
-            return Colors.blue;
-        default:
-            return Colors.magenta;
-        }
-    }
-
     function gpuName(index) {
         const name = SystemResources.gpuNames[index] || "";
         if (name)
@@ -190,14 +177,14 @@ Rectangle {
                 width: parent.width
                 icon: Icons.cpu
                 label: SystemResources.cpuModel || "CPU"
-                barColor: Colors.red
+                barColor: Colors[Colors.metricRole("cpu", SystemResources.cpuUsage)]
             }
 
             DetailRow {
                 primaryText: root.formatFrequency(SystemResources.cpuFrequency)
                 secondaryText: `${Math.round(SystemResources.cpuUsage)}%`
                 temperature: SystemResources.cpuTemp
-                accentColor: Colors.red
+                accentColor: Colors[Colors.metricRole("cpu", SystemResources.cpuUsage)]
             }
         }
 
@@ -209,7 +196,7 @@ Rectangle {
                 width: parent.width
                 icon: Icons.ram
                 label: "RAM"
-                barColor: Colors.cyan
+                barColor: Colors[Colors.metricRole("memory", SystemResources.ramUsage)]
             }
 
             DetailRow {
@@ -231,7 +218,7 @@ Rectangle {
                 required property int index
                 readonly property string driver: SystemResources.gpuDrivers[index] || "none"
                 readonly property bool toVfio: driver === "vfio-pci"
-                readonly property color accentColor: root.gpuColor(SystemResources.gpuVendors[index])
+                readonly property color accentColor: Colors[Colors.metricRole("gpu", SystemResources.gpuUsages[index] ?? 0)]
 
                 width: parent.width
                 spacing: 4
@@ -276,7 +263,7 @@ Rectangle {
                         }
                     }
                     label: diskColumn.modelData
-                    barColor: Colors.yellow
+                    barColor: Colors[Colors.metricRole("disk", SystemResources.diskUsage[diskColumn.modelData] ?? 0)]
                 }
 
                 DetailRow {
@@ -294,7 +281,7 @@ Rectangle {
                 width: parent.width
                 icon: root.networkIcon
                 label: root.networkLabel
-                barColor: Colors.cyan
+                barColor: Colors[Colors.metricRole("network", 0)]
             }
 
             RowLayout {

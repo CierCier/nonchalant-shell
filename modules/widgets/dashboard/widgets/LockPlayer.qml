@@ -265,7 +265,7 @@ StyledRect {
                     Layout.fillWidth: true
                     Layout.preferredHeight: implicitHeight
                     mode: "compact"
-                    lyricsEnabled: Config.lockscreen.lyricsEnabled
+                    lyricsEnabled: Config.lockscreen?.lyricsEnabled ?? true
                     active: GlobalStates.lockscreenVisible && !GlobalStates.lockscreenUnlocking
                 }
 
