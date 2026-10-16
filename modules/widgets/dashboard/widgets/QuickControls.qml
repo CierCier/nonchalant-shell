@@ -145,6 +145,7 @@ StyledRect {
                 }
 
                 ControlButton {
+                    visible: !root.verticalBar
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
                     iconName: Notifications.silent ? Icons.bellSlash : Icons.bell
