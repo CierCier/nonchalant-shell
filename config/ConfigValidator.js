@@ -47,7 +47,7 @@ function validate(current, defaults, keyName) {
     }
 
     if (keyName === "style") {
-        const validStyles = ["default", "island", "pills"];
+        const validStyles = ["default", "island", "pills", "left"];
         if (validStyles.indexOf(current) === -1) {
             return defaults;
         }

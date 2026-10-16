@@ -595,6 +595,11 @@ Item {
                                     label: "Pills",
                                     value: "pills",
                                     icon: Icons.dotsThree
+                                },
+                                {
+                                    label: "Left",
+                                    value: "left",
+                                    icon: Icons.arrowLeft
                                 }
                             ]
                             value: Config.bar?.style ?? "default"

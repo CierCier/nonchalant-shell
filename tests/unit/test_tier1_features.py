@@ -25,6 +25,11 @@ class TestFeature1_BarStyleConfigSetting(unittest.TestCase):
         cfg.style = "island"
         self.assertEqual(cfg.style, "island", "Config must accept 'island'")
 
+    def test_f1_accepts_left_style(self):
+        cfg = BarConfigModel()
+        cfg.style = "left"
+        self.assertEqual(cfg.style, "left", "Config must accept 'left'")
+
     def test_f1_rejects_invalid_styles(self):
         cfg = BarConfigModel()
         for invalid in ["dock", "floating", "dynamic-island", "", "ISLAND"]:
@@ -58,13 +63,15 @@ class TestFeature2_SettingsAppSelectorRow(unittest.TestCase):
 
     def setUp(self):
         self.cfg = BarConfigModel(style="default")
-        self.selector_options = ["default", "island"]
-        self.selector_labels = ["Default", "Dynamic Island"]
+        self.selector_options = ["default", "island", "pills", "left"]
+        self.selector_labels = ["Default", "Dynamic Island", "Pills", "Left"]
 
     def test_f2_selector_options_exist(self):
         self.assertIn("default", self.selector_options)
         self.assertIn("island", self.selector_options)
-        self.assertEqual(len(self.selector_options), 2)
+        self.assertIn("left", self.selector_options)
+        self.assertIn("pills", self.selector_options)
+        self.assertEqual(len(self.selector_options), 4)
 
     def test_f2_selector_reflects_active_config(self):
         self.cfg.style = "island"

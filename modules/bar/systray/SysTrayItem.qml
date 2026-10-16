@@ -14,12 +14,14 @@ MouseArea {
 
     required property SystemTrayItem item
     property int trayItemSize: 20
+    property int hitboxSize: trayItemSize
+    property bool vertical: false
     property bool isHovered: false
 
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     Layout.fillHeight: true
-    implicitWidth: trayItemSize
-    implicitHeight: trayItemSize
+    implicitWidth: hitboxSize
+    implicitHeight: hitboxSize
 
     onClicked: event => {
         switch (event.button) {
@@ -168,8 +170,8 @@ MouseArea {
                 return root.item.icon;
             }
             anchors.centerIn: parent
-            width: parent.width
-            height: parent.height
+            width: root.trayItemSize
+            height: root.trayItemSize
             smooth: true
         }
 
@@ -180,6 +182,8 @@ MouseArea {
     }
 
     StyledToolTip {
+        x: root.vertical ? root.width + 8 : (root.width - width) / 2
+        y: root.vertical ? (root.height - height) / 2 : -height
         show: root.isHovered
         tooltipText: root.item.tooltipTitle || root.item.title
         description: root.item.tooltipDescription || ""

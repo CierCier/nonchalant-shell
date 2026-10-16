@@ -60,6 +60,7 @@ PanelWindow {
     readonly property alias barOuterMargin: barContent.baseOuterMargin
     readonly property alias totalBarHeight: barContent.totalBarHeight
     readonly property string barPosition: Config.bar?.position ?? "top"
+    readonly property string barStyle: Config.bar?.style ?? "default"
     readonly property Item assistantSidebar: assistantSidebarLoader.item
 
 
@@ -202,6 +203,10 @@ PanelWindow {
                         : 0
                     anchors.bottomMargin: unifiedPanel.barEnabled
                         && unifiedPanel.barPosition === "bottom"
+                        ? unifiedPanel.barTargetHeight + unifiedPanel.barOuterMargin
+                        : 0
+                    anchors.leftMargin: unifiedPanel.barEnabled
+                        && unifiedPanel.barStyle === "left"
                         ? unifiedPanel.barTargetHeight + unifiedPanel.barOuterMargin
                         : 0
                 }

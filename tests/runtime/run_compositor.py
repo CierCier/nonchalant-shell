@@ -19,7 +19,7 @@ def arguments():
     parser.add_argument("--compositor", choices=("niri", "hyprland"), required=True)
     parser.add_argument("--artifacts", type=Path)
     parser.add_argument("--shell", action="store_true", help="also render the complete shell")
-    parser.add_argument("--style", choices=("default", "island"), default="default")
+    parser.add_argument("--style", choices=("default", "island", "left"), default="default")
     parser.add_argument("--quickshell", default="qs", help="Quickshell binary, including an older baseline package")
     parser.add_argument("--power-cycle", action="store_true", help="exercise DPMS only on disposable test outputs")
     parser.add_argument("--baseline", action="store_true", help="capture a source without CompositorService")
