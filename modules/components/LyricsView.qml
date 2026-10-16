@@ -11,29 +11,18 @@ Item {
     property string mode: "compact"
     property bool lyricsEnabled: Config.bar?.lyricsEnabled ?? true
     property bool active: false
-    property bool subscribed: false
     property bool collapseWhenEmpty: false
-    readonly property bool hasLyrics: root.hasTrack && root.lyricsEnabled
-        && LyricsService.available && !LyricsService.instrumental && LyricsService.lines.length > 0
-    visible: !root.collapseWhenEmpty || root.hasLyrics
-    clip: root.mode === "compact"
-
-    implicitHeight: root.mode === "detail" ? 140 : 22
-    readonly property bool shouldRender: root.active && root.visible
-        && root.width > 0 && root.height > 0
-    // Empty media views still request lyrics while their owning panel is open.
-    readonly property bool shouldSubscribe: root.active && root.lyricsEnabled
-        && (root.collapseWhenEmpty || root.shouldRender)
+    property bool subscribed: false
 
     readonly property bool hasTrack: MprisController.activePlayer !== null
         && MprisController.trackTitle.trim() !== ""
+    readonly property bool shouldSubscribe: root.lyricsEnabled && root.active
+        && (root.collapseWhenEmpty || root.shouldRender)
+    readonly property bool shouldRender: root.active && root.visible && root.width > 0 && root.height > 0
     readonly property string statusText: {
-        if (!root.lyricsEnabled)
-            return "Lyrics are off";
-        if (!root.hasTrack)
-            return "Nothing playing";
+        if (!root.lyricsEnabled) return "Lyrics are off";
+        if (!root.hasTrack) return "Nothing playing";
         switch (LyricsService.status) {
-        case "loading": return "Looking for lyrics";
         case "network": return "Network unavailable · retrying";
         case "missing": return "No lyrics for this track";
         case "instrumental": return "Instrumental";
@@ -42,216 +31,281 @@ Item {
         default: return "Looking for lyrics";
         }
     }
-    readonly property string compactText: {
-        if (!root.lyricsEnabled || !root.hasTrack || !LyricsService.available)
-            return root.statusText;
-        if (LyricsService.instrumental)
-            return "Instrumental";
-        if (LyricsService.synced)
-            return LyricsService.currentText || "♪";
-        return "Lyrics, untimed";
+    readonly property string compactText: root.lyricsEnabled && root.hasTrack && LyricsService.available && LyricsService.synced
+        ? LyricsService.currentText : root.statusText
+    readonly property bool isMusicInterlude: root.shouldRender && root.lyricsEnabled && root.hasTrack && LyricsService.available
+        && (LyricsService.instrumental || (LyricsService.synced && root.compactText.trim() === ""))
+    readonly property int displayIndex: LyricsService.synced && LyricsService.lines.length > 0
+        ? Math.max(0, Math.min(LyricsService.current >= 0 ? LyricsService.current : LyricsService.timelineIndex, LyricsService.lines.length - 1)) : -1
+
+    implicitWidth: 200
+    implicitHeight: root.mode === "compact" ? 22 : 140
+    visible: !root.collapseWhenEmpty || (root.hasTrack && root.lyricsEnabled && LyricsService.available)
+    clip: true
+
+    property real phase: 0
+    readonly property real currentPlaybackPosition: LyricsService.playbackPosition
+
+    NumberAnimation on phase {
+        from: 0
+        to: Math.PI * 20
+        duration: Math.PI * 20 / 2.5 * 1000
+        loops: Animation.Infinite
+        running: root.shouldSubscribe && root.shouldRender && LyricsService.available
+            && (LyricsService.synced || LyricsService.instrumental)
+        paused: running && !MprisController.isPlaying
+        easing.type: Easing.Linear
+        // All shader phase multipliers are periodic over 20π.
     }
 
-    function escapeText(text: string): string {
-        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    // TTML word ranges retain original spacing, including unspaced scripts and syllables.
-    function timedText(index: int): string {
+    function lineEnd(index: int): real {
         const line = LyricsService.lines[index];
-        if (!line || !line.words?.length)
-            return line?.text || "♪";
-        const position = LyricsService.playbackPosition;
-        let text = "";
-        let offset = 0;
+        if (!line) return 0;
+        if (line.end >= 0) return line.end;
+        const next = LyricsService.lines[index + 1];
+        if (next) return next.t;
+        return MprisController.length > line.t ? MprisController.length : line.t;
+    }
+
+    function lineProgress(index: int): real {
+        const line = LyricsService.lines[index];
+        if (!LyricsService.synced || !line) return 0;
+        const span = root.lineEnd(index) - line.t;
+        return span > 0 ? Math.max(0, Math.min(1, (root.currentPlaybackPosition - line.t) / span)) : 0;
+    }
+
+    function characterProgress(index: int): real {
+        const line = LyricsService.lines[index];
+        if (!LyricsService.synced || !line) return 0;
+        const position = root.currentPlaybackPosition;
+        if (!line.words?.length)
+            return root.lineProgress(index) * line.text.length;
+        let completed = 0;
         for (const word of line.words) {
-            text += root.escapeText(line.text.slice(offset, word.start));
-            const fragment = root.escapeText(line.text.slice(word.start, word.start + word.length));
-            if (position >= word.t && position < word.end)
-                text += '<font color="' + Colors.primary + '"><u>' + fragment + '</u></font>';
-            else if (position >= word.end)
-                text += '<font color="' + Colors.primary + '">' + fragment + '</font>';
-            else
-                text += '<font color="' + Colors.overSurfaceVariant + '">' + fragment + '</font>';
-            offset = word.start + word.length;
+            if (position < word.t)
+                return completed;
+            if (position < word.end)
+                return word.start + word.length * (position - word.t) / (word.end - word.t);
+            completed = word.start + word.length;
         }
-        return text + root.escapeText(line.text.slice(offset));
+        return line.text.length;
+    }
+
+    function interludeProgress(): real {
+        return LyricsService.instrumental ? MprisController.progress : root.lineProgress(root.displayIndex);
     }
 
     function syncSubscription(): void {
-        if (root.shouldSubscribe === root.subscribed)
-            return;
+        if (root.shouldSubscribe === root.subscribed) return;
         root.subscribed = root.shouldSubscribe;
-        if (root.subscribed)
-            LyricsService.subscribe();
-        else
-            LyricsService.release();
+        if (root.subscribed) LyricsService.subscribe();
+        else LyricsService.release();
     }
 
     onShouldSubscribeChanged: root.syncSubscription()
     Component.onCompleted: root.syncSubscription()
     Component.onDestruction: {
-        if (root.subscribed)
-            LyricsService.release();
+        if (root.subscribed) LyricsService.release();
     }
 
-    FontMetrics {
-        id: compactFontMetrics
-        font: compactLine.font
-    }
-
-    Text {
-        id: compactLine
-        anchors.verticalCenter: parent.verticalCenter
-        width: wordTimed ? Math.max(root.width, compactFontMetrics.advanceWidth(root.compactText)) : root.width
-        height: root.height
+    Item {
+        id: compactContent
+        anchors.fill: parent
         visible: root.shouldRender && root.mode === "compact"
-        readonly property bool wordTimed: root.shouldRender && root.mode === "compact"
-            && root.lyricsEnabled && LyricsService.available && LyricsService.synced
-            && (LyricsService.lines[LyricsService.current]?.words?.length ?? 0) > 0
-        text: wordTimed ? root.timedText(LyricsService.current) : root.compactText
-        textFormat: wordTimed ? Text.StyledText : Text.PlainText
-        Accessible.name: root.compactText
-        x: {
-            if (!compactLine.wordTimed || width <= root.width)
-                return 0;
-            const words = LyricsService.lines[LyricsService.current].words;
-            const position = LyricsService.playbackPosition;
-            let character = words[0].start;
-            for (const word of words) {
-                if (word.t <= position)
-                    character = word.start + Math.floor(word.length / 2);
+
+        readonly property string cueKey: visible && LyricsService.available && LyricsService.synced
+            ? LyricsService.track + "\n" + LyricsService.current : ""
+        property string previousTrack: ""
+        property int previousIndex: -1
+        property real entryOffset: 0
+
+        // Long lyrics travel left as their words fill. Each following cue starts
+        // on the right instead of inheriting the outgoing lyric's scroll offset.
+        function advanceCue(): void {
+            const index = cueKey !== "" ? LyricsService.current : -1;
+            const track = cueKey !== "" ? LyricsService.track : "";
+            const nextCue = track === previousTrack && previousIndex >= 0
+                && index === previousIndex + 1 && MprisController.isPlaying;
+            previousTrack = track;
+            previousIndex = index;
+            cueEntrance.stop();
+            entryOffset = 0;
+            if (nextCue && Motion.enabled)
+                cueEntrance.start();
+        }
+
+        onCueKeyChanged: Qt.callLater(advanceCue)
+        transform: Translate { x: compactContent.entryOffset }
+        NumberAnimation {
+            id: cueEntrance
+            target: compactContent
+            property: "entryOffset"
+            from: root.width
+            to: 0
+            duration: Config.animDuration
+            easing.type: Easing.OutQuad
+        }
+
+        FluidLyricsText {
+            id: compactLine
+            objectName: "compactLyricText"
+            visible: root.shouldRender && root.mode === "compact" && !root.isMusicInterlude
+            FontMetrics {
+                id: compactFontMetrics
+                font: compactLine.font
             }
-            const prefix = LyricsService.lines[LyricsService.current].text.slice(0, character);
-            return Math.max(root.width - width,
-                Math.min(0, root.width / 2 - compactFontMetrics.advanceWidth(prefix)));
+            readonly property real textAdvance: Math.ceil(compactFontMetrics.advanceWidth(root.compactText)) + 1
+            width: Math.max(1, LyricsService.synced ? textAdvance : root.width)
+            height: root.height
+            text: root.mode === "compact" ? root.compactText : ""
+            Accessible.name: root.compactText
+            font.pixelSize: Styling.fontSize(-1)
+            wrapMode: TextEdit.NoWrap
+            horizontalAlignment: width > root.width ? TextEdit.AlignLeft : TextEdit.AlignHCenter
+            characterProgress: fluidEnabled ? root.characterProgress(LyricsService.current) : 0
+            playing: MprisController.isPlaying
+            progressDuration: LyricsService.positionInterval
+            phase: fluidEnabled ? root.phase : 0
+            fluidEnabled: visible && root.mode === "compact" && root.shouldRender && root.lyricsEnabled && LyricsService.available && LyricsService.synced && LyricsService.current >= 0
+            x: {
+                if (width <= root.width) return (root.width - width) / 2;
+                return Math.max(root.width - width, Math.min(0, root.width / 2 - fillCursor.x));
+            }
         }
-        Behavior on x {
-            NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuad }
+
+        LyricsInterlude {
+            objectName: "compactInterlude"
+            anchors.centerIn: parent
+            visible: root.shouldRender && root.mode === "compact" && root.isMusicInterlude
+            progress: visible ? root.interludeProgress() : 0
+            phase: playing ? root.phase : 0
+            playing: visible && MprisController.isPlaying
         }
-        color: root.lyricsEnabled && LyricsService.available && LyricsService.synced
-            && LyricsService.current >= 0 ? Colors.primary : Colors.overSurfaceVariant
-        font.family: Config.theme.font
-        font.pixelSize: Styling.fontSize(-1)
-        font.weight: Font.DemiBold
-        wrapMode: Text.NoWrap
-        elide: wordTimed ? Text.ElideNone : Text.ElideRight
-        horizontalAlignment: wordTimed && width > root.width ? Text.AlignLeft : Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
     }
 
     Text {
         anchors.centerIn: parent
         width: parent.width
         visible: root.shouldRender && root.mode === "detail"
-            && (!root.lyricsEnabled || !LyricsService.available || LyricsService.instrumental)
+            && (!root.lyricsEnabled || !LyricsService.available)
         text: root.statusText
         color: Colors.overSurfaceVariant
         font.family: Config.theme.font
         font.pixelSize: Styling.fontSize(1)
-        font.weight: Font.DemiBold
         horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
         wrapMode: Text.Wrap
     }
 
-    FontMetrics {
-        id: lyricFontMetrics
-        font.family: Config.theme.font
-        font.pixelSize: Styling.fontSize(1)
-        font.weight: Font.DemiBold
+    LyricsInterlude {
+        objectName: "instrumentalInterlude"
+        anchors.centerIn: parent
+        visible: root.shouldRender && root.mode === "detail" && LyricsService.available && LyricsService.instrumental
+        progress: visible ? root.interludeProgress() : 0
+        phase: playing ? root.phase : 0
+        playing: visible && MprisController.isPlaying
     }
 
-    ListView {
-        id: lyricLines
+    Loader {
+        id: detailListLoader
         anchors.fill: parent
-        visible: root.shouldRender && root.mode === "detail" && root.lyricsEnabled
+        active: root.shouldRender && root.mode === "detail" && root.lyricsEnabled
             && LyricsService.available && !LyricsService.instrumental
-        clip: true
-        model: visible ? LyricsService.lines : []
-        spacing: 8
-        interactive: !LyricsService.synced
-        currentIndex: visible && LyricsService.synced && count > 0
-            ? Math.min(LyricsService.current, count - 1) : -1
-        highlightRangeMode: LyricsService.synced
-            ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
-        // Strict range enforcement can change currentItem; do not size the range from it.
-        preferredHighlightBegin: Math.max(0, (height - lyricFontMetrics.height) / 2)
-        preferredHighlightEnd: Math.min(height,
-            preferredHighlightBegin + lyricFontMetrics.height)
-        highlightMoveDuration: Config.animDuration
-        highlightFollowsCurrentItem: true
-        header: Item {
-            width: 1
-            height: LyricsService.synced ? 0 : lyricLines.height / 3
-        }
-        footer: Item {
-            width: 1
-            height: lyricLines.height / 3
-        }
-
-        delegate: Item {
-            id: lyricLine
-            required property var modelData
-            required property int index
-
-            readonly property bool seekable: LyricsService.synced
-                && (MprisController.activePlayer?.canSeek ?? false)
-                && Number(lyricLine.modelData.t) >= 0
-
-            activeFocusOnTab: seekable
-            Accessible.role: seekable ? Accessible.Button : Accessible.StaticText
-            Accessible.name: lyricLine.modelData.text
-            Accessible.description: seekable ? "Seek to this lyric" : ""
-            Accessible.onPressAction: {
-                if (lyricLine.seekable)
-                    LyricsService.seekTo(Number(lyricLine.modelData.t));
+        sourceComponent: ListView {
+            id: lyricLines
+            objectName: "lyricLines"
+            anchors.fill: parent
+            visible: root.shouldRender && root.mode === "detail" && root.lyricsEnabled
+                && LyricsService.available && !LyricsService.instrumental
+            clip: true
+            model: visible ? LyricsService.lines : []
+            spacing: Styling.fontSize(-1) * 0.12
+            interactive: !LyricsService.synced
+            currentIndex: visible ? root.displayIndex : -1
+            highlightRangeMode: ListView.NoHighlightRange
+            // Center the complete delegate, including wrapped lyrics. Range enforcement
+            // can change currentIndex; a one-way scroll target keeps timing authoritative.
+            function centerCurrent(): void {
+                if (LyricsService.synced && currentItem)
+                    contentY = currentItem.y + currentItem.height / 2 - height / 2;
             }
-            Keys.onReturnPressed: event => {
-                if (lyricLine.seekable) {
-                    LyricsService.seekTo(Number(lyricLine.modelData.t));
-                    event.accepted = true;
+            onCurrentItemChanged: Qt.callLater(centerCurrent)
+            onHeightChanged: Qt.callLater(centerCurrent)
+            onWidthChanged: Qt.callLater(centerCurrent)
+            Behavior on contentY {
+                enabled: LyricsService.synced
+                NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuad }
+            }
+            header: Item { width: 1; height: LyricsService.synced ? lyricLines.height / 2 : 0 }
+            footer: Item { width: 1; height: LyricsService.synced ? lyricLines.height / 2 : 0 }
+
+            delegate: Item {
+                id: lyricLine
+                required property var modelData
+                required property int index
+                readonly property int distance: Math.abs(index - root.displayIndex)
+                readonly property real restingScale: !LyricsService.synced || distance === 0 ? 1 : (distance === 1 ? 0.84 : 0.72)
+                readonly property bool interlude: modelData.text.trim() === ""
+                readonly property bool seekable: LyricsService.synced
+                    && (MprisController.activePlayer?.canSeek ?? false) && modelData.t >= 0
+                width: lyricLines.width
+                implicitHeight: interlude ? marker.implicitHeight : lineText.implicitHeight
+                height: implicitHeight * restingScale
+                opacity: !LyricsService.synced || distance === 0 ? 1 : (distance === 1 ? 0.3 : (distance === 2 ? 0.12 : 0.04))
+                scale: restingScale
+                onHeightChanged: {
+                    if (lyricLine.index === lyricLines.currentIndex)
+                        Qt.callLater(lyricLines.centerCurrent);
                 }
-            }
-            Keys.onSpacePressed: event => {
-                if (lyricLine.seekable) {
-                    LyricsService.seekTo(Number(lyricLine.modelData.t));
-                    event.accepted = true;
+                onYChanged: {
+                    if (lyricLine.index === lyricLines.currentIndex)
+                        Qt.callLater(lyricLines.centerCurrent);
                 }
-            }
-            readonly property int distance: LyricsService.current < 0
-                ? lyricLine.index + 1
-                : Math.abs(lyricLine.index - LyricsService.current)
+                Behavior on opacity { NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuad } }
+                Behavior on scale { NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuad } }
 
-            width: lyricLines.width
-            implicitHeight: lineText.implicitHeight
+                activeFocusOnTab: seekable
+                Accessible.role: seekable ? Accessible.Button : Accessible.StaticText
+                Accessible.name: interlude ? "Instrumental break" : modelData.text
+                Accessible.description: seekable ? "Seek to this lyric" : ""
+                Accessible.onPressAction: if (seekable) LyricsService.seekTo(modelData.t)
+                Keys.onReturnPressed: event => {
+                    if (seekable) { LyricsService.seekTo(modelData.t); event.accepted = true; }
+                }
+                Keys.onSpacePressed: event => {
+                    if (seekable) { LyricsService.seekTo(modelData.t); event.accepted = true; }
+                }
 
-            Text {
-                id: lineText
-                anchors.fill: parent
-                readonly property bool wordTimed: lyricLine.distance === 0
-                    && (lyricLine.modelData.words?.length ?? 0) > 0
-                text: wordTimed ? root.timedText(lyricLine.index)
-                    : (lyricLine.modelData.text !== "" ? lyricLine.modelData.text : "♪")
-                textFormat: wordTimed ? Text.StyledText : Text.PlainText
-                color: lyricLine.distance === 0 ? Colors.primary : Colors.overBackground
-                opacity: !LyricsService.synced || lyricLine.distance === 0
-                    ? 1 : Math.max(0.24, 0.56 - 0.1 * lyricLine.distance)
-                font.family: Config.theme.font
-                font.pixelSize: Styling.fontSize(1)
-                font.weight: Font.DemiBold
-                font.underline: lyricLine.activeFocus
-                wrapMode: Text.Wrap
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                enabled: lyricLine.seekable
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                    lyricLine.forceActiveFocus();
-                    LyricsService.seekTo(Number(lyricLine.modelData.t));
+                FluidLyricsText {
+                    id: lineText
+                    objectName: "detailLyricText"
+                    width: parent.width
+                    y: (parent.height - height) / 2
+                    visible: !lyricLine.interlude
+                    text: lyricLine.modelData.text
+                    font.pixelSize: Styling.fontSize(6)
+                    characterProgress: fluidEnabled ? root.characterProgress(lyricLine.index) : 0
+                    playing: MprisController.isPlaying
+                    progressDuration: LyricsService.positionInterval
+                    phase: fluidEnabled ? root.phase : 0
+                    fluidEnabled: visible && root.shouldRender && LyricsService.synced && lyricLine.distance === 0
+                }
+                LyricsInterlude {
+                    id: marker
+                    objectName: "lineInterlude"
+                    anchors.centerIn: parent
+                    visible: lyricLine.interlude
+                    progress: visible && lyricLine.distance === 0 ? root.lineProgress(lyricLine.index) : 0
+                    phase: playing ? root.phase : 0
+                    playing: lyricLine.distance === 0 && MprisController.isPlaying
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: lyricLine.seekable
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: {
+                        lyricLine.forceActiveFocus();
+                        LyricsService.seekTo(lyricLine.modelData.t);
+                    }
                 }
             }
         }

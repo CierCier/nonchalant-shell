@@ -86,20 +86,20 @@ def parse_ttml(ttml):
 
         visit(paragraph)
         text = "".join(pieces)
-        if not text.strip():
-            continue
         begin = timestamp(paragraph.get("begin"))
         end = timestamp(paragraph.get("end"))
         if begin is None and words:
             begin = min(word["t"] for word in words)
         if end is None and words:
             end = max(word["end"] for word in words)
-        line = {"t": begin if begin is not None else -1, "text": text}
+        if not text.strip() and (begin is None or end is None):
+            continue
+        line = {"t": begin if begin is not None else -1, "text": text if text.strip() else ""}
         if begin is not None and end is not None:
             if end <= begin:
                 raise ValueError("Invalid TTML line duration")
             line["end"] = end
-        if words:
+        if words and text.strip():
             line["words"] = words
         lines.append(line)
 

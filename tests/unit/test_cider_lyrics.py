@@ -49,6 +49,19 @@ class CiderLyricsTests(unittest.TestCase):
         self.assertEqual(plain["lines"], [{"t": -1, "text": "Plain <text>"}])
         self.assertFalse(plain["synced"])
 
+    def test_interlude_paragraph_with_empty_text_is_preserved(self):
+        ttml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0" end="15"></p><p begin="15" end="18">Words</p></body></tt>'
+        result = cider.parse_ttml(ttml)
+        self.assertEqual(result["lines"], [
+            {"t": 0.0, "end": 15.0, "text": ""},
+            {"t": 15.0, "end": 18.0, "text": "Words"},
+        ])
+        self.assertTrue(result["synced"])
+
+    def test_timed_whitespace_has_no_word_ranges_after_normalization(self):
+        result = cider.parse_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><p begin="0" end="2"><span begin="0" end="2"> </span></p></tt>')
+        self.assertEqual(result["lines"], [{"t": 0.0, "end": 2.0, "text": ""}])
+
     def test_invalid_times_and_empty_documents(self):
         for value in ("nan", "-1", "00:00:00:01"):
             with self.assertRaises(ValueError):

@@ -224,13 +224,11 @@ ShellRoot {
                 Config.lockscreen.lyricsEnabled = true
                 tryCompare(LyricsService, "watchers", 1, 1000)
                 tryCompare(lockLyrics, "visible", true)
-                const currentLine = lockLyrics.children.find(child => child.text !== undefined && child.visible)
+                const currentLine = findChild(lockLyrics, "compactLyricText")
                 verify(currentLine !== undefined)
                 tryCompare(currentLine, "text", "Only the current lyric")
-                const scrollingLines = lockLyrics.children.find(child => child.currentIndex !== undefined)
-                verify(scrollingLines !== undefined)
-                compare(scrollingLines.visible, false)
-                compare(scrollingLines.count, 0, "Neighbor lyrics must not be rendered on the lockscreen")
+                compare(findChild(lockLyrics, "lyricLines"), null,
+                    "The compact lockscreen must not instantiate neighboring lyrics")
                 tryVerify(() => lock.height === lock.implicitHeight && lock.height > emptyLockHeight)
                 verify(lock.height - emptyLockHeight <= lockLyrics.implicitHeight,
                     "The card must grow only enough to fit its current lyric")
@@ -308,7 +306,7 @@ def exercise(fixture, video_id="invalid", player_name="nonchalant_test",
                 return {
                     "Metadata": self.metadata(), "PlaybackStatus": self.playback,
                     "Position": dbus.Int64(self.current_position() * 1_000_000), "Rate": dbus.Double(self.rate),
-                    "MinimumRate": dbus.Double(1), "MaximumRate": dbus.Double(1),
+                    "MinimumRate": dbus.Double(0.5), "MaximumRate": dbus.Double(2),
                     "CanControl": True, "CanSeek": True, "CanPlay": True, "CanPause": True,
                     "CanGoNext": False, "CanGoPrevious": False,
                 }
@@ -354,6 +352,13 @@ def exercise(fixture, video_id="invalid", player_name="nonchalant_test",
             self.rate = 1.0 if self.playback == "Playing" else 0.0
             self.PropertiesChanged(interface, {
                 "PlaybackStatus": self.playback, "Rate": dbus.Double(self.rate)}, [])
+
+        @dbus.service.method("org.nonchalant.Test", in_signature="d")
+        def SetRate(self, rate):
+            self.move_position(self.current_position())
+            self.rate = float(rate)
+            self.PropertiesChanged(interface, {"Rate": dbus.Double(self.rate)}, [])
+            self.Seeked(dbus.Int64(self.position * 1_000_000))
 
         @dbus.service.method("org.nonchalant.Test", in_signature="x")
         def SetTrack(self, seconds):

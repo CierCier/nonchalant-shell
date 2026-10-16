@@ -275,6 +275,9 @@ class BarTextRuntimeTests(unittest.TestCase):
                 if source.name != "services":
                     (modules / source.name).symlink_to(source, target_is_directory=source.is_dir())
             shutil.copytree(ROOT / "modules/services", modules / "services")
+            shortcuts = modules / "services/GlobalShortcuts.qml"
+            shortcuts.write_text(shortcuts.read_text().replace(
+                '"/tmp/nonchalant_ipc.pipe"', '"' + str(fixture / "ipc.pipe") + '"'))
             (modules / "services/compositor/NiriBackend.qml").write_text(
                 "import QtQuick\nCompositorBackend {}\n")
             (fixture / "shell.qml").write_text(QML)

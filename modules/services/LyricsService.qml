@@ -24,9 +24,9 @@ Singleton {
     property bool instrumental: false
     property string source: ""
     property int current: -1
+    property int timelineIndex: -1
     property real playbackPosition: 0
-    property real anchorPosition: 0
-    property real anchorTime: 0
+    readonly property int positionInterval: 33
 
     readonly property bool hasTrack: MprisController.activePlayer !== null
         && MprisController.trackTitle.trim() !== ""
@@ -65,12 +65,12 @@ Singleton {
         && root.current >= 0 && root.current + 1 < root.lines.length
         ? root.lines[root.current + 1].text : ""
 
-    readonly property real lead: root.source === "cider" ? 0 : 0.25
+    readonly property real lead: 0
 
     onTrackChanged: root.resetTrack()
     onWantedChanged: {
         if (root.wanted) {
-            root.reanchor();
+            root.place();
             if (root.readFor !== root.track)
                 Qt.callLater(root.fetch);
         } else {
@@ -86,16 +86,16 @@ Singleton {
         target: MprisController
         function onPositionChanged() {
             if (root.wanted)
-                root.reanchor();
+                root.place();
         }
         function onIsPlayingChanged() {
             if (root.wanted)
-                root.reanchor();
+                root.place();
         }
     }
 
     Timer {
-        interval: root.source === "cider" ? 33 : 120
+        interval: root.positionInterval
         running: root.wanted && root.available && root.synced && MprisController.isPlaying
         repeat: true
         onTriggered: root.place()
@@ -125,10 +125,10 @@ Singleton {
         root.source = "";
         root.readFor = "";
         root.current = -1;
+        root.timelineIndex = -1;
         root.retryAttempt = 0;
         retry.stop();
-        root.anchorPosition = MprisController.position;
-        root.anchorTime = Date.now();
+        root.playbackPosition = MprisController.activePlayer?.position ?? 0;
         root.status = root.wanted ? "loading" : "idle";
 
         if (root.queryActive) {
@@ -141,18 +141,14 @@ Singleton {
         }
     }
 
-    function reanchor(): void {
-        root.anchorPosition = MprisController.position;
-        root.anchorTime = Date.now();
-        root.place();
-    }
-
     function place(): void {
-        const elapsed = MprisController.isPlaying
-            ? Math.max(0, (Date.now() - root.anchorTime) / 1000) : 0;
-        root.playbackPosition = root.anchorPosition + elapsed;
+        // This getter already advances with the player's rate in Quickshell.
+        // Reading the controller's cached position or extrapolating it again
+        // introduces a second clock and makes pause/rate/seek timing disagree.
+        root.playbackPosition = MprisController.activePlayer?.position ?? 0;
         if (!root.available || !root.synced) {
             root.current = -1;
+            root.timelineIndex = -1;
             return;
         }
 
@@ -166,10 +162,8 @@ Singleton {
             else
                 high = middle;
         }
-        root.current = low - 1;
-        const line = root.lines[root.current];
-        if (line?.end >= 0 && now >= line.end)
-            root.current = -1;
+        root.timelineIndex = low - 1;
+        root.current = root.timelineIndex;
     }
 
     function seekTo(seconds: real): bool {
@@ -180,10 +174,29 @@ Singleton {
         const length = MprisController.length;
         const target = Math.max(0, Math.min(length > 0 ? length : seconds, seconds));
         player.position = target;
-        root.anchorPosition = target;
-        root.anchorTime = Date.now();
         root.place();
         return true;
+    }
+
+    // Blank API lines are real timeline entries. Explicit TTML ends also let us
+    // represent intros, gaps and outros without guessing from lyric length.
+    function withInterludes(parsed: list<var>, duration: real): list<var> {
+        const result = [];
+        let coveredUntil = 0;
+        for (let i = 0; i < parsed.length; ++i) {
+            const line = parsed[i];
+            // Preserve API blank cues. A brief TTML gap is a breath, not an
+            // instrumental row: inserting one makes the list jump twice.
+            if (line.t > coveredUntil && (result.length === 0 || line.t - coveredUntil >= 2))
+                result.push({ t: coveredUntil, end: line.t, text: "", words: [] });
+            result.push(line);
+            // A line without an end remains active until the next timestamp.
+            const end = line.end >= 0 ? line.end : (parsed[i + 1]?.t ?? Number.POSITIVE_INFINITY);
+            coveredUntil = Math.max(coveredUntil, end);
+        }
+        if (Number.isFinite(coveredUntil) && (duration <= 0 || duration > coveredUntil))
+            result.push({ t: coveredUntil, end: duration > coveredUntil ? duration : -1, text: "", words: [] });
+        return result;
     }
 
     function fetch(): void {
@@ -344,7 +357,9 @@ Singleton {
                 words.push(word);
                 lastEnd = word.start + word.length;
             }
-            parsed.push({ t: time, end: end, text: line.text, words: words });
+            const text = line.text.trim() === "" || /^[♪♫♬♩]+$/.test(line.text.trim())
+                ? "" : line.text;
+            parsed.push({ t: time, end: end, text: text, words: words });
         }
         if (parsed.length === 0) {
             root.lines = [];
@@ -358,7 +373,8 @@ Singleton {
             return;
         }
 
-        root.lines = parsed;
+        parsed.sort((a, b) => a.t - b.t);
+        root.lines = report.synced === true ? root.withInterludes(parsed, MprisController.length) : parsed;
         root.source = report.source === "cider" ? "cider" : "lrclib";
         root.synced = report.synced === true;
         root.instrumental = false;
