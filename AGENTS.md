@@ -1,5 +1,5 @@
 ## OVERVIEW
-Nonchalant Shell is a Niri-first Wayland shell and hard fork of Ambxst, built with Quickshell. The lean runtime provides a wallpaper, one unified bar, a floating run menu, and a lockscreen, driven by a reactive JSON configuration system. Multi-monitor support uses `Variants` on `Quickshell.screens`.
+Nonchalant Shell is a Niri-first Wayland shell with Hyprland support and hard fork of Ambxst, built with Quickshell. The lean runtime provides a wallpaper, one unified bar, a floating run menu, and a lockscreen, driven by a reactive JSON configuration system. Multi-monitor support uses `Variants` on `Quickshell.screens`.
 
 ## STRUCTURE
 ```
@@ -65,7 +65,7 @@ Nonchalant Shell is a Niri-first Wayland shell and hard fork of Ambxst, built wi
 | `GradientCache` | Singleton | `modules/components/GradientCache.qml` | GPU texture sharing optimization |
 | `UnifiedShellPanel` | Component | `modules/shell/UnifiedShellPanel.qml` | Full-screen input surface for the bar and floating run menu |
 | `ShellRoot` | Component | `shell.qml` | Root window. `Variants` per screen |
-| `NiriService` | Singleton | `modules/services/NiriService.qml` | Compositor abstraction (focus, dispatch) |
+| `CompositorService` | Singleton | `modules/services/CompositorService.qml` | Typed compositor state and desktop actions; selected Niri/Hyprland backend |
 | `StateService` | Singleton | `modules/services/StateService.qml` | JSON persistence for session state |
 | `FocusGrabManager` | Singleton | `modules/services/FocusGrabManager.qml` | Input focus coordination |
 | `AudioFormat` | Singleton | `modules/services/AudioFormat.qml` | Headphone classification (bt/usb/wired) + negotiated sample rate/bit depth via pactl |
@@ -119,7 +119,7 @@ Nonchalant Shell is a Niri-first Wayland shell and hard fork of Ambxst, built wi
 ```bash
 # Syntax check QML files
 qmllint shell.qml
-# Run shell (requires Quickshell + Niri)
+# Run shell (requires Quickshell 0.3.2 + a supported compositor)
 qs -p .
 # Or via CLI wrapper:
 ./cli.sh
@@ -130,5 +130,6 @@ qs ipc call nonchalant run <cmd>
 ## NOTES
 - Large files: Keep components modular and prune dead code aggressively.
 - The `qs.` import prefix is a Quickshell VFS construct, not a physical directory.
-- All compositor integration uses Niri IPC or native Quickshell/Wayland APIs. Hyprland and `axctl` dependencies are forbidden.
+- UI compositor state/actions go through `CompositorService`. Niri IPC and native Quickshell Hyprland APIs belong in the selected backend; `axctl` is forbidden.
+- Tests must use disposable headless displays, private runtime/config/cache paths, and a private D-Bus session. Never address the user's compositor sockets or restart their desktop.
 - AI assistant is integrated via local ACP agent protocols.

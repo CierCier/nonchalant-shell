@@ -134,7 +134,12 @@ refresh)
 	;;
 run)
 	CMD="${2:-}"
-	PIPE="${XDG_RUNTIME_DIR:-/tmp}/nonchalant_ipc_$UID.pipe"
+	if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+		PIPE="$XDG_RUNTIME_DIR/nonchalant_ipc.pipe"
+	else
+		SESSION_DISPLAY="${WAYLAND_DISPLAY:-default}"
+		PIPE="${XDG_CACHE_HOME:-$HOME/.cache}/nonchalant/ipc/${SESSION_DISPLAY##*/}.pipe"
+	fi
 
 
 	if [ -z "$CMD" ]; then
@@ -142,9 +147,11 @@ run)
 		exit 1
 	fi
 
-	# Fast path: Write directly to pipe if it exists (Zero latency)
 	if [ -p "$PIPE" ]; then
-		echo "$CMD" >"$PIPE" &
+		if ! timeout 1s bash -c 'printf "%s\n" "$1" >"$2"' nonchalant-ipc-write "$CMD" "$PIPE"; then
+			echo "Error: Nonchalant IPC pipe is not accepting commands" >&2
+			exit 1
+		fi
 		exit 0
 	fi
 
@@ -186,23 +193,23 @@ quit)
 screen)
 	SUB="${2:-}"
 	case "$SUB" in
-	off) NIRI_ACTION="power-off-monitors" ;;
-	on) NIRI_ACTION="power-on-monitors" ;;
+	off) POWERED=false ;;
+	on) POWERED=true ;;
 	*)
 		echo "Usage: nonchalant screen [on|off]"
 		exit 1
 		;;
 	esac
 
-	if ! command -v niri &>/dev/null; then
-		notify-send "Screen ${SUB}" "niri is required to control the screen"
+	PID=$(find_nonchalant_pid_cached)
+	if [ -z "$PID" ]; then
+		exec python3 "$SCRIPT_DIR/scripts/compositor_power.py" "$SUB"
+	fi
+	RESULT=$(qs ipc --pid "$PID" call compositor power "$POWERED")
+	if [ "$RESULT" != "true" ]; then
+		echo "Error: Compositor did not accept monitor power request" >&2
 		exit 1
 	fi
-
-	niri msg action "$NIRI_ACTION" >/dev/null || {
-		notify-send "Screen ${SUB}" "Failed to change monitor power state"
-		exit 1
-	}
 	;;
 suspend)
 	if command -v systemctl &>/dev/null; then
@@ -232,15 +239,10 @@ brightness)
 	# Handle list flag
 	if [ "$ARG2" = "-l" ] || [ "$ARG2" = "--list" ]; then
 		echo "Monitors:"
-		if command -v niri &>/dev/null; then
-			niri msg -j outputs 2>/dev/null | jq -r 'keys[] | "  \(.)"' || {
-				echo "Error: Could not list monitors"
-				exit 1
-			}
-		else
-			echo "Error: niri not found"
+		qs ipc --pid "$PID" call compositor outputs || {
+			echo "Error: Could not list monitors" >&2
 			exit 1
-		fi
+		}
 		exit 0
 	fi
 

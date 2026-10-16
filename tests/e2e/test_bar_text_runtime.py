@@ -17,9 +17,25 @@ import Quickshell.Io
 import qs.config
 import qs.modules.bar.layouts
 import qs.modules.services
+import qs.modules.services.compositor
 import qs.modules.theme
 
 ShellRoot {
+    CompositorState { id: compositorState }
+    CompositorWorkspace {
+        id: testWorkspace
+        Component.onCompleted: this.id = "1"
+        active: true
+        output: Quickshell.screens[0].name
+        windows: compositorState.windows.length
+    }
+    CompositorWindow {
+        id: testWindow
+        Component.onCompleted: this.id = "1"
+        workspaceId: "1"
+        output: Quickshell.screens[0].name
+        tiledAtTop: true
+    }
     FloatingWindow {
         visible: true
         implicitWidth: 1200
@@ -64,12 +80,17 @@ ShellRoot {
                 console.log("BAR_PIN_IPC_PASSED")
             }
 
+            function initTestCase() {
+                tryVerify(() => CompositorService.backend !== null)
+                CompositorService.backend.state = compositorState
+            }
+
             function cleanup() {
                 bar.sourceComponent = undefined
                 Notifications.dismissAllPopups()
                 Notifications.silent = false
-                NiriService.workspaces.values = []
-                NiriService.clients.values = []
+                compositorState.workspaces = []
+                compositorState.windows = []
             }
 
             function test_notifications_data() {
@@ -88,8 +109,8 @@ ShellRoot {
             function test_notifications(data) {
                 Config.bar.pinned = data.pinned
                 Config.theme.animDuration = data.duration
-                NiriService.workspaces.values = [{id: 1, active: true, output: Quickshell.screens[0].name}]
-                NiriService.clients.values = [{id: 1, workspace: {id: 1}, floating: false}]
+                compositorState.workspaces = [testWorkspace]
+                compositorState.windows = [testWindow]
                 bar.sourceComponent = data.component
                 tryVerify(() => bar.item !== null)
                 const panel = bar.item
@@ -139,8 +160,8 @@ ShellRoot {
             function test_interrupted_retraction(data) {
                 Config.bar.pinned = false
                 Config.theme.animDuration = 100
-                NiriService.workspaces.values = [{id: 1, active: true, output: Quickshell.screens[0].name}]
-                NiriService.clients.values = [{id: 1, workspace: {id: 1}, floating: false}]
+                compositorState.workspaces = [testWorkspace]
+                compositorState.windows = [testWindow]
                 bar.sourceComponent = data.component
                 tryVerify(() => bar.item !== null)
                 const panel = bar.item
@@ -161,7 +182,7 @@ ShellRoot {
                     } else if (interrupt === "pin") {
                         Config.bar.pinned = true
                     } else {
-                        NiriService.clients.values = []
+                        compositorState.windows = []
                     }
                     tryCompare(panel, "containerY", 0, 1500)
                     compare(panel.retractingToHidden, false)
@@ -170,7 +191,7 @@ ShellRoot {
                     Notifications.dismissAllPopups()
                     panel.collapse()
                     Config.bar.pinned = false
-                    NiriService.clients.values = [{id: 1, workspace: {id: 1}, floating: false}]
+                    compositorState.windows = [testWindow]
                     tryCompare(panel, "currentMode", "collapsed")
                     tryCompare(panel, "retractingToHidden", false)
                     tryCompare(panel, "revealProgress", 0)
@@ -227,6 +248,7 @@ ShellRoot {
 
             function cleanupTestCase() {
                 console.log("BAR_CONTEXT_TEXT_RUNTIME_FINISHED")
+                CompositorService.backend.state = null
                 Qt.quit()
             }
         }
@@ -247,21 +269,14 @@ class BarTextRuntimeTests(unittest.TestCase):
             fixture = Path(directory)
             for name in ("config", "assets", "scripts", "version"):
                 (fixture / name).symlink_to(ROOT / name, target_is_directory=(ROOT / name).is_dir())
-            # Isolate the command runner's FIFO from the live desktop session.
             modules = fixture / "modules"
             modules.mkdir()
             for source in (ROOT / "modules").iterdir():
                 if source.name != "services":
                     (modules / source.name).symlink_to(source, target_is_directory=source.is_dir())
-            services = modules / "services"
-            services.mkdir()
-            for source in (ROOT / "modules/services").iterdir():
-                target = services / source.name
-                if source.name == "GlobalShortcuts.qml":
-                    target.write_text(source.read_text().replace(
-                        '"/tmp/nonchalant_ipc.pipe"', '"' + str(fixture / "ipc.pipe") + '"'))
-                else:
-                    target.symlink_to(source, target_is_directory=source.is_dir())
+            shutil.copytree(ROOT / "modules/services", modules / "services")
+            (modules / "services/compositor/NiriBackend.qml").write_text(
+                "import QtQuick\nCompositorBackend {}\n")
             (fixture / "shell.qml").write_text(QML)
             home = fixture / "home"
             home.mkdir()
@@ -280,14 +295,21 @@ class BarTextRuntimeTests(unittest.TestCase):
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CACHE_HOME": str(home / ".cache"),
                 "XDG_RUNTIME_DIR": str(runtime),
-                "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "no-session-bus"),
                 "QT_QPA_PLATFORM": "offscreen",
                 "QT_QUICK_BACKEND": "software",
                 "NIRI_SOCKET": str(fixture / "no-compositor.sock"),
+                "NONCHALANT_COMPOSITOR": "niri",
             }
+            bus_config = fixture / "dbus.conf"
+            bus_config.write_text(
+                '<busconfig><type>session</type><auth>EXTERNAL</auth>'
+                f'<listen>unix:path={runtime / "bus"}</listen>'
+                '<policy context="default"><allow send_destination="*"/>'
+                '<allow receive_sender="*"/><allow own="*"/></policy></busconfig>')
+            env.pop("DBUS_SESSION_BUS_ADDRESS", None)
             env.pop("WAYLAND_DISPLAY", None)
             result = subprocess.run(
-                ["qs", "-p", str(fixture), "--no-duplicate", "--no-color"],
+                ["dbus-run-session", f"--config-file={bus_config}", "--", "qs", "-p", str(fixture), "--no-duplicate", "--no-color"],
                 env=env, capture_output=True, text=True, timeout=65,
             )
             output = result.stdout + result.stderr

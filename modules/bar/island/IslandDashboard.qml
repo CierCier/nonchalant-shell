@@ -36,7 +36,7 @@ Item {
     readonly property var currentMonitor: {
         if (root.screen)
             return Brightness.getMonitorForScreen(root.screen);
-        const focused = NiriService.focusedMonitor;
+        const focused = CompositorService.focusedMonitor;
         if (focused)
             return Brightness.getMonitorForScreen(focused);
         return Brightness.monitors.length > 0 ? Brightness.monitors[0] : null;

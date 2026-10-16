@@ -58,7 +58,7 @@ Singleton {
     }
 
     function increaseBrightness(): void {
-        const focusedName = NiriService.focusedMonitor?.name;
+        const focusedName = CompositorService.focusedMonitor?.name;
         if (!focusedName)
             return;
         const monitor = monitors.find(m => focusedName === m.screen.name);
@@ -67,7 +67,7 @@ Singleton {
     }
 
     function decreaseBrightness(): void {
-        const focusedName = NiriService.focusedMonitor?.name;
+        const focusedName = CompositorService.focusedMonitor?.name;
         if (!focusedName)
             return;
         const monitor = monitors.find(m => focusedName === m.screen.name);

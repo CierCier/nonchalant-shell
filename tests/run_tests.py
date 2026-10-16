@@ -111,6 +111,22 @@ def run_schema_tests(collector: TestResultCollector, verbose: bool):
         collector.record_tier("Config Schema (Node.js)", passed=passed, failed=failed or 1, errors=0, duration=dur)
 
 
+def run_compositor_tests(collector: TestResultCollector, verbose: bool):
+    print("\n--- Running Actual Compositor Codecs (Node.js) ---")
+    files = ["tests/compositor/test_niri.js", "tests/compositor/test_hyprland.js"]
+    code, stdout, stderr, duration = run_command(["node", "--test", *files])
+    passed_match = re.search(r"^# pass (\d+)$", stdout, re.MULTILINE)
+    failed_match = re.search(r"^# fail (\d+)$", stdout, re.MULTILINE)
+    passed = int(passed_match.group(1)) if passed_match else 0
+    failed = int(failed_match.group(1)) if failed_match else 0
+    if verbose or code != 0:
+        print(stdout)
+        print(stderr)
+    else:
+        print(f"  {passed} passed, {failed} failed")
+    collector.record_tier("Compositor codecs (Node.js)", passed, failed or int(code != 0), 0, duration)
+
+
 def run_unittest_suite(suite_name: str, test_module: str, collector: TestResultCollector, verbose: bool):
     print(f"\n--- Running {suite_name} ---")
     start = time.time()
@@ -154,6 +170,7 @@ def main():
     parser.add_argument("--tier2", action="store_true", help="Run Tier 2: Boundary & Corner Cases")
     parser.add_argument("--tier3", action="store_true", help="Run Tier 3: Cross-Feature Interactions")
     parser.add_argument("--tier4", action="store_true", help="Run Tier 4: Real-World Scenarios")
+    parser.add_argument("--codecs", action="store_true", help="Run actual Niri/Hyprland codec tests")
     parser.add_argument("--schema", action="store_true", help="Run Bar config schema & validator tests")
     parser.add_argument("--qmllint", action="store_true", help="Run QML syntax validation via qmllint")
     parser.add_argument("--json", action="store_true", help="Output machine-readable JSON summary")
@@ -162,7 +179,7 @@ def main():
     args = parser.parse_args()
 
     # Default to all if no specific flags chosen
-    run_all = args.all or not (args.tier1 or args.tier2 or args.tier3 or args.tier4 or args.schema or args.qmllint)
+    run_all = args.all or not (args.tier1 or args.tier2 or args.tier3 or args.tier4 or args.schema or args.qmllint or args.codecs)
 
     collector = TestResultCollector()
 
@@ -171,6 +188,12 @@ def main():
 
     if run_all or args.schema:
         run_schema_tests(collector, args.verbose)
+
+    if run_all or args.codecs:
+        run_compositor_tests(collector, args.verbose)
+        run_unittest_suite("Standalone compositor power", "tests.unit.test_compositor_power", collector, args.verbose)
+        run_unittest_suite("Compositor runner failures", "tests.unit.test_runtime_runner", collector, args.verbose)
+        run_unittest_suite("CLI FIFO delivery", "tests.unit.test_cli_ipc", collector, args.verbose)
 
     if run_all or args.tier1:
         run_unittest_suite("Tier 1: Feature Coverage", "tests.unit.test_tier1_features", collector, args.verbose)

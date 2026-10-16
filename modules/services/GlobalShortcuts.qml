@@ -12,12 +12,19 @@ Singleton {
     id: root
 
     readonly property string appId: "nonchalant"
-    readonly property string ipcPipe: "/tmp/nonchalant_ipc.pipe"
+    readonly property string ipcPipe: {
+        const runtime = Quickshell.env("XDG_RUNTIME_DIR");
+        if (runtime)
+            return runtime + "/nonchalant_ipc.pipe";
+        const cache = Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache";
+        const display = (Quickshell.env("WAYLAND_DISPLAY") || "default").split("/").pop();
+        return cache + "/nonchalant/ipc/" + display + ".pipe";
+    }
 
     // High-performance Pipe Listener (Daemon mode)
     Process {
         id: pipeListener
-        command: ["bash", "-c", "rm -f " + root.ipcPipe + "; mkfifo " + root.ipcPipe + "; tail -f " + root.ipcPipe]
+        command: ["bash", "-c", "umask 077; mkdir -p -- \"$(dirname -- \"$1\")\" && rm -f -- \"$1\" && mkfifo -m 600 -- \"$1\" && exec tail -f -- \"$1\"", "nonchalant-ipc-listener", root.ipcPipe]
         running: true
         
         stdout: SplitParser {
@@ -201,15 +208,15 @@ Singleton {
         if (willOpen) {
             FocusGrabManager.clearTopGrab();
             const targetMonitor = screenName
-                ? NiriService.monitorFor(screenName)
-                : NiriService.focusedMonitor;
+                ? CompositorService.monitorFor(screenName)
+                : CompositorService.focusedMonitor;
             GlobalStates.settingsTargetWorkspaceId =
                 targetMonitor?.activeWorkspace?.id
-                || NiriService.focusedMonitor?.activeWorkspace?.id
-                || NiriService.focusedWorkspace?.id
-                || 0;
+                || CompositorService.focusedMonitor?.activeWorkspace?.id
+                || CompositorService.focusedWorkspace?.id
+                || "";
             GlobalStates.settingsTargetScreenName =
-                targetMonitor?.name || NiriService.focusedMonitor?.name || "";
+                targetMonitor?.name || CompositorService.focusedMonitor?.name || "";
             // Close bar popups / run menu under the settings window.
             Visibilities.closeActiveBarPopup();
             Visibilities.setActiveModule("");

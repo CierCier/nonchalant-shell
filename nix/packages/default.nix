@@ -1,14 +1,14 @@
 # Main Nonchalant package
-{ pkgs, lib, self, system, version }:
+{ pkgs, runtimePkgs ? pkgs, lib, self, system, version }:
 
 let
-  quickshellPkg = pkgs.quickshell;
+  quickshellPkg = runtimePkgs.quickshell;
 
   # Import sub-packages
   ttf-phosphor-icons = import ./phosphor-icons.nix { inherit pkgs; };
 
   # Import modular package lists
-  corePkgs = import ./core.nix { inherit pkgs quickshellPkg; };
+  corePkgs = import ./core.nix { pkgs = runtimePkgs; inherit quickshellPkg; };
   toolsPkgs = import ./tools.nix { inherit pkgs; };
   mediaPkgs = import ./media.nix { inherit pkgs; };
   appsPkgs = import ./apps.nix { inherit pkgs; };

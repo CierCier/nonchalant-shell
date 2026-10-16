@@ -24,7 +24,7 @@ Item {
         // Empty command = lock via LockscreenService.
         { icon: Icons.suspend, label: "Suspend", command: ["systemctl", "suspend"] },
         { icon: Icons.lock, label: "Lock Session", command: [] },
-        { icon: Icons.logout, label: "Log out", command: ["niri", "msg", "action", "quit", "--skip-confirmation"] },
+        { icon: Icons.logout, label: "Log out", command: [], action: "logout" },
         { icon: Icons.reboot, label: "Reboot", command: ["systemctl", "reboot"] },
         { icon: Icons.shutdown, label: "Power Off", command: ["systemctl", "poweroff"], danger: true }
     ]
@@ -47,7 +47,9 @@ Item {
 
     function activate(index: int) {
         const command = actions[index]?.command ?? [];
-        if (command.length > 0)
+        if (actions[index]?.action === "logout")
+            CompositorService.logout();
+        else if (command.length > 0)
             Quickshell.execDetached(command);
         else
             LockscreenService.lock();

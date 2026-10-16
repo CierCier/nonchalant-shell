@@ -34,7 +34,7 @@ FloatingWindow {
     }
 
     function preparePlacement() {
-        const targetScreen = screenByName(GlobalStates.settingsTargetScreenName || NiriService.focusedMonitor?.name || "");
+        const targetScreen = screenByName(GlobalStates.settingsTargetScreenName || CompositorService.focusedMonitor?.name || "");
         if (targetScreen) {
             settingsWindow.screen = targetScreen;
         }
@@ -44,17 +44,23 @@ FloatingWindow {
     }
 
     function placeOnTargetWorkspace() {
-        const targetWorkspace = GlobalStates.settingsTargetWorkspaceId || NiriService.focusedMonitor?.activeWorkspace?.id || NiriService.focusedWorkspace?.id || 0;
+        const capturedWorkspace = CompositorService.workspaceById(GlobalStates.settingsTargetWorkspaceId);
+        const targetMonitor = CompositorService.monitorFor(GlobalStates.settingsTargetScreenName) ?? CompositorService.focusedMonitor;
+        const targetWorkspace = capturedWorkspace?.id ?? targetMonitor?.activeWorkspace?.id ?? CompositorService.focusedWorkspace?.id ?? "";
         if (!targetWorkspace) return false;
 
-        const clients = NiriService.clients.values || [];
+        const clients = CompositorService.windows || [];
         for (let i = 0; i < clients.length; i++) {
             const client = clients[i];
-            if (client.title === settingsWindow.title) {
-                if (client.workspace?.id !== targetWorkspace) {
-                    NiriService.moveWindowToWorkspace(client.id, targetWorkspace, false);
+            if (client.pid === Quickshell.processId && client.title === settingsWindow.title) {
+                if (client.workspaceId !== targetWorkspace) {
+                    CompositorService.moveWindowToWorkspace(client.id, targetWorkspace, false);
+                    return false;
                 }
-                NiriService.focusWindow(client.id);
+                if (!client.is_focused) {
+                    CompositorService.focusWindow(client.id);
+                    return false;
+                }
                 return true;
             }
         }

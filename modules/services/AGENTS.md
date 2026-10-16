@@ -19,7 +19,7 @@ Backend singletons bridging Wayland protocols, CLI tools (nmcli, upower, wpctl, 
 | **Notifications** | `Notifications.qml` | D-Bus notification server with persistence |
 | **System Monitor** | `SystemResources.qml` | CPU, RAM, GPU, temps via Python script |
 | **GPU / VFIO** | `GpuService.qml` | Legacy VFIO / PRIME management. Windows runs natively in a separate installation as of 2026-10-10; do not enable the retired VM/VFIO workflow unless requested. |
-| **Compositor** | `NiriService.qml` | Native Niri IPC abstraction (windows, workspaces, focus) |
+| **Compositor** | `CompositorService.qml` + `compositor/` | Typed shared state, selected Niri IPC or native Quickshell Hyprland backend |
 | **Visibility** | `Visibilities.qml` | Per-screen UI visibility/layering orchestration |
 | **State** | `StateService.qml` | JSON persistence for session state (tab positions, etc.) |
 | **Focus** | `FocusGrabManager.qml` | Input focus coordination across overlays |
@@ -46,6 +46,6 @@ Backend singletons bridging Wayland protocols, CLI tools (nmcli, upower, wpctl, 
 ## ANTI-PATTERNS
 - Overusing untyped `property var` when concrete types or typed lists are available.
 - Wrapping internal child objects (`Connections`, `Timer`, `Process`) in `property var` declarations.
-- Retaining obsolete compositor shims (e.g. Hyprland syntax in `dispatch()`, `HL_INITIAL_WORKSPACE_TOKEN`).
+- Exposing raw compositor dispatch strings to UI callers. Use typed shared actions; keep wire JSON and protocol selectors inside compositor backends.
 - Modifying list models synchronously inside `Process.onStdout` handlers.
 - Leaving `isUpdating` flags stuck true when a process fails or exits with non-zero status.
