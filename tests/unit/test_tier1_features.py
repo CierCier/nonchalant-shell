@@ -774,10 +774,9 @@ class TestFeature16_WeatherDetailsAndMediaCenter(unittest.TestCase):
         self.assertIn("MprisController.cyclePlayer(1)", content)
         self.assertIn("Icons.disc", content)
 
-        # Rotating vinyl disc
+        # Rotating artwork disc
         self.assertIn("RotationAnimation on rotation", content)
-        self.assertIn("discRotation", content)
-        self.assertIn("faceArtworkDisc", content)
+        self.assertIn("coverImage", content)
         self.assertIn("MprisController.isPlaying", content)
 
         # Controls & Waveform with interactive bounce/scale behaviors

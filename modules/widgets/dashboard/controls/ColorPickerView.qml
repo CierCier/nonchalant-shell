@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 import qs.modules.theme
 import qs.modules.components
 import qs.config
@@ -211,12 +210,12 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: colorDialog.open()
+                        onClicked: customColorPicker.open()
                     }
 
                     StyledToolTip {
-                        visible: pickerMouseArea.containsMouse
-                        text: "Color picker"
+                        show: pickerMouseArea.containsMouse
+                        tooltipText: "Color picker"
                     }
                 }
             }
@@ -307,14 +306,12 @@ Item {
         }
     }
 
-    ColorDialog {
-        id: colorDialog
+    CustomColorPicker {
+        id: customColorPicker
+        parent: Overlay.overlay
+        initialColor: Config.resolveColor(root.currentColor)
         title: root.dialogTitle
-        selectedColor: Config.resolveColor(root.currentColor)
 
-        onAccepted: {
-            root.colorSelected(selectedColor.toString().toUpperCase());
-            // Don't close - let user continue selecting
-        }
+        onColorSelected: color => root.colorSelected(color)
     }
 }

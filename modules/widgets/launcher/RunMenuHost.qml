@@ -14,7 +14,8 @@ Item {
     required property ShellScreen screen
 
     readonly property var screenVisibilities: Visibilities.getForScreen(screen.name)
-    readonly property bool open: (Config.bar?.style !== "island") && (screenVisibilities ? screenVisibilities.launcher : false)
+    readonly property bool isIslandLike: (Config.bar?.style === "island" || Config.bar?.style === "pills")
+    readonly property bool open: !isIslandLike && (screenVisibilities ? screenVisibilities.launcher : false)
     readonly property Item hitbox: menuSurface.fullyHidden ? null : menuSurface.body
     property PanelWindow barPanel: Visibilities.getBarPanelForScreen(screen.name)
     readonly property int edgeGap: 8
@@ -61,9 +62,9 @@ Item {
                 id: launcherLoader
                 anchors.fill: parent
                 // Keep loaded so open/close does not hitch on first paint.
-                // The island hosts its own launcher, so skip this copy there
+                // The island/pills hosts its own launcher, so skip this copy there
                 // (but finish a closing animation after a style switch).
-                active: Config.bar?.style !== "island" || root.menuShown
+                active: !root.isIslandLike || root.menuShown
                 sourceComponent: Component {
                     LauncherView {}
                 }

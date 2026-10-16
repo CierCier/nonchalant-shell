@@ -27,12 +27,20 @@ CORE_FILES=(
     "modules/shell/ReservationWindows.qml"
     "modules/shell/UnifiedShellPanel.qml"
     "modules/widgets/dashboard/controls/ShellPanel.qml"
+    "modules/services/LyricsService.qml"
+    "modules/services/MediaDuration.qml"
+    "modules/services/SystemResources.qml"
+    "modules/components/LyricsView.qml"
+    "modules/widgets/dashboard/controls/SettingsTab.qml"
+    "modules/widgets/dashboard/controls/SettingsIndex.qml"
+    "modules/widgets/dashboard/controls/CustomColorPicker.qml"
 )
 
 # Also include modular bar files if they exist
 OPTIONAL_FILES=(
     "modules/bar/layouts/DefaultBar.qml"
     "modules/bar/layouts/IslandBar.qml"
+    "modules/bar/layouts/PillsBar.qml"
     "modules/bar/island/IslandDashboard.qml"
     "modules/bar/island/IslandPowerPanel.qml"
     "modules/bar/island/IslandSoundPanel.qml"

@@ -35,8 +35,8 @@ PanelWindow {
         item: osdSurface.body
     }
 
-    readonly property bool isIsland: (Config.bar?.style ?? "default") === "island"
-    // The island embeds its own OSD banner.
+    readonly property bool isIsland: (Config.bar?.style ?? "default") === "island" || (Config.bar?.style ?? "default") === "pills"
+    // The island/pills embeds its own OSD banner.
     readonly property bool showing: GlobalStates.osdVisible && !isIsland
 
     visible: showing || !osdSurface.fullyHidden

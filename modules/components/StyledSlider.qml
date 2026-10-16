@@ -21,6 +21,7 @@ Item {
 
     signal iconClicked
     signal iconHovered(bool hovered)
+    signal valueEdited(real newValue)
 
     property bool vertical: false
     property string icon: ""
@@ -190,8 +191,9 @@ Item {
             }
 
             StyledToolTip {
+                requireHover: false
                 tooltipText: root.tooltipText
-                visible: root.isDragging && root.tooltip && !root.vertical
+                show: root.isDragging && root.tooltip && !root.vertical
                 x: hDragHandle.x + hDragHandle.width / 2 - width / 2
                 y: hDragHandle.y - height - 5
             }
@@ -294,8 +296,9 @@ Item {
             }
 
             StyledToolTip {
+                requireHover: false
                 tooltipText: root.tooltipText
-                visible: root.isDragging && root.tooltip && root.vertical
+                show: root.isDragging && root.tooltip && root.vertical
                 x: vDragHandle.x + vDragHandle.width + 5
                 y: vDragHandle.y + vDragHandle.height / 2 - height / 2
             }
@@ -386,6 +389,7 @@ Item {
             root.dragPosition = pos;
             if (!root.updateOnRelease) {
                 root.value = root.snapMode === "always" ? pos : root.dragPosition;
+                root.valueEdited(root.value);
             }
         }
 
@@ -398,6 +402,7 @@ Item {
                 root.dragPosition = pos;
                 if (!root.updateOnRelease) {
                     root.value = root.snapMode === "always" ? pos : root.dragPosition;
+                    root.valueEdited(root.value);
                 }
             }
         }
@@ -409,6 +414,7 @@ Item {
                     finalValue = root.applyStep(finalValue);
                 }
                 root.value = finalValue;
+                root.valueEdited(finalValue);
                 root.dragPosition = finalValue;
                 root.isDragging = false;
             }
@@ -426,6 +432,7 @@ Item {
                 } else {
                     root.value = root.applyStep(Math.max(0, root.value - scrollStep));
                 }
+                root.valueEdited(root.value);
             } else {
                 wheel.accepted = false;
             }

@@ -6,8 +6,11 @@ pinned and reserves space through `ReservationWindows`.
 
 ## STRUCTURE
 - **Core Layout**:
-  - `BarContent.qml`: Orchestrates the top-bar widget groups.
-  - `BarBg.qml`: Background and content padding.
+  - `BarContent.qml`: Orchestrates the bar layout engine (`default`, `island`, `pills`).
+  - `BarBg.qml`: Background and content padding for default bar.
+  - `layouts/DefaultBar.qml`: Fixed full-width top/bottom panel with taskbar, clock, and sliders.
+  - `layouts/IslandBar.qml`: Dynamic island pinned to top edge with concave ears and morphing panels.
+  - `layouts/PillsBar.qml`: Floating modular pills layout with fluid spring morphing for all panels.
 - **Widgets**:
   - `clock/`: Time, date, weather integration (`Clock.qml`).
   - `systray/`: SNI-based system tray (`SysTray.qml`, `SysTrayItem.qml`).

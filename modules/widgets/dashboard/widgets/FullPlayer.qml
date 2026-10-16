@@ -16,6 +16,7 @@ StyledRect {
 
     property real playerRadius: Config.roundness > 0 ? Config.roundness + 4 : 0
     property bool playersListExpanded: false
+    property bool lyricsActive: false
 
     visible: true
     radius: playerRadius
@@ -25,8 +26,8 @@ StyledRect {
     readonly property bool isDragging: realSeekBar.isDragging
 
     property bool isPlaying: MprisController.activePlayer?.playbackState === MprisPlaybackState.Playing
-    property real position: MprisController.activePlayer?.position ?? 0.0
-    property real length: MprisController.activePlayer?.length ?? 1.0
+    property real position: MprisController.position
+    property real length: MprisController.length
     property bool hasArtwork: (MprisController.activePlayer?.trackArtUrl ?? "") !== ""
     property string wallpaperPath: {
         if (!GlobalStates.wallpaperManager) return "";
@@ -35,15 +36,6 @@ StyledRect {
         return frame ? "file://" + frame : "";
     }
     property bool hasActivePlayer: MprisController.activePlayer !== null
-    property bool isSeeking: false
-
-    Timer {
-        id: seekUnlockTimer
-        interval: 1000
-        repeat: false
-        onTriggered: player.isSeeking = false
-    }
-
     function formatTime(seconds) {
         const totalSeconds = Math.floor(seconds);
         const hours = Math.floor(totalSeconds / 3600);
@@ -54,54 +46,6 @@ StyledRect {
             return hours + ":" + (minutes < 10 ? "0" : "") + minutes + ":" + (secs < 10 ? "0" : "") + secs;
         } else {
             return minutes + ":" + (secs < 10 ? "0" : "") + secs;
-        }
-    }
-
-    // Function to sync seekBar with current media position
-    function syncSeekBarPosition() {
-        if (!realSeekBar.isDragging && !player.isSeeking) {
-            if (player.hasActivePlayer) {
-                realSeekBar.value = player.length > 0 ? player.position / player.length : 0;
-            } else {
-                realSeekBar.value = 0;
-            }
-        }
-    }
-
-    Timer {
-        running: player.isPlaying && player.visible
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            syncSeekBarPosition();
-            MprisController.activePlayer?.positionChanged();
-        }
-    }
-
-    Connections {
-        target: MprisController.activePlayer
-        function onPositionChanged() {
-            syncSeekBarPosition();
-        }
-    }
-
-    Component.onCompleted: {
-        syncSeekBarPosition();
-    }
-
-    Connections {
-        target: MprisController
-        function onActivePlayerChanged() {
-            Qt.callLater(syncSeekBarPosition);
-        }
-    }
-
-    Connections {
-        target: GlobalStates
-        function onDashboardOpenChanged() {
-            if (GlobalStates.dashboardOpen) {
-                Qt.callLater(syncSeekBarPosition);
-            }
         }
     }
 
@@ -200,6 +144,7 @@ StyledRect {
 
                 CircularSeekBar {
                 id: realSeekBar
+                value: MprisController.progress
                 anchors.fill: parent
                 accentColor: Colors.primary
                 trackColor: Colors.outline
@@ -212,13 +157,10 @@ StyledRect {
                 startAngleDeg: 180
                 spanAngleDeg: 180
 
-                enabled: player.hasActivePlayer && (MprisController.activePlayer?.canSeek ?? false)
+                enabled: player.length > 0 && (MprisController.activePlayer?.canSeek ?? false)
 
                 onValueEdited: newValue => {
                     if (MprisController.activePlayer && MprisController.activePlayer.canSeek) {
-                        player.isSeeking = true;
-                        seekUnlockTimer.restart();
-                        realSeekBar.value = newValue;
                         MprisController.activePlayer.position = newValue * player.length;
                     }
                 }
@@ -421,6 +363,16 @@ StyledRect {
             }
         }
 
+        LyricsView {
+            collapseWhenEmpty: true
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(implicitHeight,
+                Math.max(22, player.height - player.implicitHeight + 22))
+            mode: "detail"
+            lyricsEnabled: Config.bar.lyricsEnabled
+            active: player.lyricsActive
+        }
+
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
             spacing: 8
@@ -548,7 +500,7 @@ StyledRect {
             renderType: Text.NativeRendering
             font.hintingPreference: Font.PreferFullHinting
             Layout.alignment: Qt.AlignHCenter
-            text: player.hasActivePlayer ? (player.formatTime(player.position) + " / " + player.formatTime(player.length)) : "--:-- / --:--"
+            text: player.hasActivePlayer ? (player.formatTime(player.position) + " / " + (player.length > 0 ? player.formatTime(player.length) : "--:--")) : "--:-- / --:--"
             color: Colors.overBackground
             font.pixelSize: Config.theme.fontSize - 2
             font.family: Config.theme.font

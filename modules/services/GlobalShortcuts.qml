@@ -52,6 +52,9 @@ Singleton {
             case "wallpapers":
                 toggleWallpapers();
                 break;
+            case "wallpaper-colors":
+                GlobalStates.wallpaperManager?.setMatugenScheme("scheme-wallpaper");
+                break;
             case "powermenu":
             case "power":
                 Visibilities.togglePowerMenuForActive();
@@ -61,6 +64,9 @@ Singleton {
                 toggleAlerts();
                 break;
             case "dashboard": toggleDashboard(); break;
+            case "bar-pin":
+                Config.bar.pinned = !(Config.bar?.pinned ?? false);
+                break;
             case "sound":
             case "audio":
                 Visibilities.setActiveModule("sound");
@@ -193,6 +199,7 @@ Singleton {
     function toggleSettings(screenName) {
         const willOpen = !GlobalStates.settingsWindowVisible;
         if (willOpen) {
+            FocusGrabManager.clearTopGrab();
             const targetMonitor = screenName
                 ? NiriService.monitorFor(screenName)
                 : NiriService.focusedMonitor;

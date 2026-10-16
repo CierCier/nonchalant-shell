@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+"""Prefer Cider's exact-recording lyrics, otherwise fetch and cache LRCLIB lyrics.
+
+Usage: lyrics.py <artist> <title> <album> <seconds> [source-url] [cider-track-id]
+
+The JSON response contains timed lines (`t` in seconds), plain lines (`t: -1`),
+an instrumental result, or a missing/network status. Successful LRCLIB answers
+are cached indefinitely; confirmed misses are cached for one week. Cider answers
+and network errors are not cached.
+"""
+
+import hashlib
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+if __package__:
+    from .cider_lyrics import report as cider_report
+else:
+    from cider_lyrics import report as cider_report
+
+ENDPOINT = "https://lrclib.net/api"
+TIMEOUT = 8
+AGENT = "Nonchalant Shell lyrics"
+MISS_TTL = 7 * 24 * 3600
+
+STAMP = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
+NOISE = re.compile(
+    r"\s*[\(\[](official|lyric|audio|video|visuali[sz]er|hd|4k|mv)[^\)\]]*[\)\]]",
+    re.IGNORECASE,
+)
+
+
+def cache_dir():
+    base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+    path = os.path.join(base, "nonchalant", "lyrics")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def is_youtube(source_url):
+    host = urllib.parse.urlparse(source_url).hostname or ""
+    return host == "youtu.be" or host == "youtube.com" or host.endswith(".youtube.com")
+
+
+def clean(artist, title, source_url=""):
+    topic = bool(re.search(r"\s*-\s*Topic$", artist))
+    artist = re.sub(r"\s*-\s*Topic$", "", artist).strip()
+    title = NOISE.sub("", title).strip()
+    video = is_youtube(source_url)
+    if video:
+        title = title.split("|", 1)[0].strip()
+        title = re.sub(r'(?<=["”])\s+(?:song|video song|full video)$', "", title, flags=re.IGNORECASE)
+        title = title.strip().strip('"“”')
+    if (not artist or video) and " - " in title:
+        artist, title = (part.strip() for part in title.split(" - ", 1))
+    elif video and not topic:
+        # YouTube's artist is often a channel or record label, not the performer.
+        artist = ""
+    return artist, title
+
+
+class Busy(Exception):
+    """LRCLIB could not answer this lookup."""
+
+
+def ask(path, params):
+    url = f"{ENDPOINT}/{path}?{urllib.parse.urlencode(params)}"
+    request = urllib.request.Request(url, headers={"User-Agent": AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT) as answer:
+            return json.load(answer)
+    except urllib.error.HTTPError as error:
+        if error.code < 500 and error.code != 429:
+            return None
+        raise Busy(f"HTTP {error.code}") from error
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        raise Busy(str(error)) from error
+
+
+def folded(text):
+    return re.sub(r"\W+", " ", text.casefold()).strip()
+
+
+def lookup(artist, title, album, seconds, video=False):
+    """Match artist and duration, preferring exact titles before timed lyrics."""
+    found = []
+    busy = False
+    wanted = folded(title)
+    if not wanted:
+        return None
+    wanted_artist = folded(artist)
+
+    def eligible(entry):
+        return (
+            wanted in folded(entry.get("trackName") or "")
+            and (not wanted_artist or wanted_artist == folded(entry.get("artistName") or ""))
+            and (video or seconds <= 0 or abs((entry.get("duration") or 0) - seconds) <= 8)
+            and (entry.get("syncedLyrics") or entry.get("plainLyrics") or entry.get("instrumental"))
+        )
+
+    def take(results):
+        found.extend(entry for entry in results if entry and eligible(entry))
+
+    if seconds > 0 and artist:
+        params = {"artist_name": artist, "track_name": title, "duration": round(seconds)}
+        if album:
+            params["album_name"] = album
+        try:
+            take([ask("get", params)])
+        except Busy:
+            busy = True
+        if found and found[0].get("syncedLyrics") and abs((found[0].get("duration") or 0) - seconds) <= 8:
+            return found[0]
+
+    questions = [
+        {"track_name": title, **({"artist_name": artist} if artist else {})},
+        {"q": f"{artist} {title}".strip()},
+    ]
+    for params in questions:
+        try:
+            take(ask("search", params) or [])
+        except Busy:
+            busy = True
+            continue
+        if any(entry.get("syncedLyrics") and folded(entry.get("trackName") or "") == wanted
+               and (seconds <= 0 or abs((entry.get("duration") or 0) - seconds) <= 8)
+               for entry in found):
+            break
+
+    if not found:
+        if busy:
+            raise Busy("no answer")
+        return None
+
+    def rank(entry):
+        offset = abs((entry.get("duration") or 0) - seconds) if seconds > 0 else 0
+        return (seconds > 0 and offset > 8,
+                folded(entry.get("trackName") or "") != wanted,
+                not entry.get("syncedLyrics"), offset)
+
+    entry = min(found, key=rank)
+    if video and not artist:
+        best_rank = rank(entry)
+        artists = {folded(candidate.get("artistName") or "")
+                   for candidate in found if rank(candidate) == best_rank}
+        if len(artists) > 1:
+            return None
+    if video and (seconds <= 0 or abs((entry.get("duration") or 0) - seconds) > 8):
+        # Music videos can include extra scenes. Their recording's timestamps
+        # cannot be applied to the video, but its words can still be displayed.
+        entry = {**entry, "syncedLyrics": "", "plainLyrics": entry.get("plainLyrics")
+                 or "\n".join(STAMP.sub("", line).strip()
+                              for line in (entry.get("syncedLyrics") or "").splitlines())}
+    return entry
+
+
+def parse(entry):
+    if entry.get("instrumental"):
+        return {"available": True, "synced": False, "instrumental": True, "lines": []}
+
+    lines = []
+    for raw in (entry.get("syncedLyrics") or "").splitlines():
+        stamps = STAMP.findall(raw)
+        text = STAMP.sub("", raw).strip()
+        for minutes, seconds in stamps:
+            lines.append({"t": int(minutes) * 60 + float(seconds), "text": text})
+    if lines:
+        lines.sort(key=lambda line: line["t"])
+        return {"available": True, "synced": True, "instrumental": False, "lines": lines}
+
+    plain = [line.strip() for line in (entry.get("plainLyrics") or "").splitlines()]
+    if any(plain):
+        return {
+            "available": True,
+            "synced": False,
+            "instrumental": False,
+            "lines": [{"t": -1, "text": line} for line in plain],
+        }
+    return None
+
+
+def report(artist, title, album, seconds, source_url="", cider_track_id=None):
+    if cider_track_id is not None:
+        cider = cider_report(artist, title, cider_track_id)
+        if cider:
+            return cider
+    video = is_youtube(source_url)
+    artist, title = clean(artist, title, source_url)
+    if not title:
+        return {"available": False, "reason": "missing"}
+
+    signature = f"{artist}\n{title}\n{album}\n{round(seconds)}"
+    if video:
+        signature = "youtube-v2\n" + signature
+    key = hashlib.sha1(signature.encode()).hexdigest()
+    path = os.path.join(cache_dir(), f"{key}.json")
+    try:
+        with open(path, encoding="utf-8") as file:
+            kept = json.load(file)
+        if isinstance(kept, dict) and (
+            kept.get("available")
+            or (kept.get("reason") == "missing" and time.time() - kept.get("at", 0) < MISS_TTL)
+        ):
+            kept.pop("at", None)
+            return kept
+    except (OSError, ValueError):
+        pass
+
+    try:
+        entry = lookup(artist, title, album, seconds, video=video)
+        result = (parse(entry) if entry else None) or {"available": False, "reason": "missing"}
+    except Busy as error:
+        sys.stderr.write(f"lyrics: {error}\n")
+        return {"available": False, "reason": "network"}
+
+    staging = f"{path}.tmp"
+    with open(staging, "w", encoding="utf-8") as file:
+        json.dump({**result, "at": time.time()}, file)
+    os.replace(staging, path)
+    return result
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    cider_track_id = args[5] if len(args) > 5 else None
+    args += [""] * 5
+    try:
+        length = float(args[3] or 0)
+    except ValueError:
+        length = 0
+    try:
+        print(json.dumps(report(args[0], args[1], args[2], length, args[4], cider_track_id)))
+    except Exception as error:
+        sys.stderr.write(f"lyrics failed: {error}\n")
+        print(json.dumps({"available": False, "reason": "network"}))

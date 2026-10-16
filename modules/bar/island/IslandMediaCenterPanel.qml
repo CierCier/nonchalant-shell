@@ -18,6 +18,11 @@ Item {
     implicitHeight: mainCol.implicitHeight + 28
 
     signal backRequested()
+    property bool lyricsActive: false
+    property real maximumHeight: 0
+    readonly property real fixedContentHeight: headerRow.implicitHeight
+        + heroRow.implicitHeight + waveformRow.Layout.preferredHeight
+        + playbackRow.implicitHeight + mainCol.spacing * 3 + 28
 
     readonly property bool hasPlayer: MprisController.activePlayer !== null
     readonly property bool isPlaying: MprisController.isPlaying
@@ -71,6 +76,7 @@ Item {
         // HEADER: Back button + Title + (Right) Player Switcher + Close
         // ═══════════════════════════════════════════════════════════════
         RowLayout {
+            id: headerRow
             Layout.fillWidth: true
             spacing: 8
 
@@ -183,166 +189,64 @@ Item {
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // HERO: Rotating Vinyl Face Disc + Track Typography
+        // HERO: Artwork + Track Typography
         // ═══════════════════════════════════════════════════════════════
         RowLayout {
+            id: heroRow
             Layout.fillWidth: true
             spacing: 16
 
-            // ── ROTATING VINYL DISC CONTAINER ──
             Item {
-                id: discContainer
                 implicitWidth: 96
                 implicitHeight: 96
                 Layout.alignment: Qt.AlignVCenter
 
-                scale: discMouse.pressed ? 0.92 : 1.0
+                scale: artworkMouse.pressed ? 0.92 : 1.0
                 PressBehavior on scale {
-                    pressed: discMouse.pressed
+                    pressed: artworkMouse.pressed
                 }
 
-                // Shadow ring for 3D depth
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: parent.width + 4
-                    height: width
+                StyledRect {
+                    anchors.fill: parent
+                    variant: "internalbg"
+                    radius: width / 2
+                }
+
+                ClippingRectangle {
+                    anchors.fill: parent
                     radius: width / 2
                     color: "transparent"
-                    border.color: Qt.rgba(0, 0, 0, 0.45)
-                    border.width: 3
-                }
-
-                // Rotating Vinyl Disc body
-                Item {
-                    id: vinylDisc
-                    anchors.fill: parent
 
                     RotationAnimation on rotation {
-                        id: discRotation
-                        running: root.isPlaying
+                        running: coverImage.status === Image.Ready
+                        paused: !root.isPlaying
                         loops: Animation.Infinite
                         from: 0
                         to: 360
                         duration: 8000
                     }
 
-                    // Vinyl base record
-                    Rectangle {
+                    Image {
+                        id: coverImage
                         anchors.fill: parent
-                        radius: width / 2
-                        color: "#0e0e12"
-                        border.color: "#252530"
-                        border.width: 1.5
+                        source: root.trackArt
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        visible: status === Image.Ready
+                    }
 
-                        // Concentric vinyl microgrooves
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: parent.width * 0.88
-                            height: width
-                            radius: width / 2
-                            color: "transparent"
-                            border.color: Qt.rgba(1, 1, 1, 0.07)
-                            border.width: 1
-                        }
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: parent.width * 0.76
-                            height: width
-                            radius: width / 2
-                            color: "transparent"
-                            border.color: Qt.rgba(1, 1, 1, 0.06)
-                            border.width: 1
-                        }
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: parent.width * 0.64
-                            height: width
-                            radius: width / 2
-                            color: "transparent"
-                            border.color: Qt.rgba(1, 1, 1, 0.05)
-                            border.width: 1
-                        }
-
-                        // Vinyl specular reflection cones (dual opposing highlights)
-                        Canvas {
-                            anchors.fill: parent
-                            antialiasing: true
-                            onPaint: {
-                                const ctx = getContext("2d");
-                                ctx.reset();
-                                const cx = width / 2;
-                                const cy = height / 2;
-                                const r = width / 2;
-
-                                ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-
-                                // Cone 1
-                                ctx.beginPath();
-                                ctx.moveTo(cx, cy);
-                                ctx.arc(cx, cy, r, -0.45, 0.45);
-                                ctx.closePath();
-                                ctx.fill();
-
-                                // Cone 2
-                                ctx.beginPath();
-                                ctx.moveTo(cx, cy);
-                                ctx.arc(cx, cy, r, Math.PI - 0.45, Math.PI + 0.45);
-                                ctx.closePath();
-                                ctx.fill();
-                            }
-                        }
-
-                        // ── THE FACE DISC: Center Album Artwork ──
-                        ClippingRectangle {
-                            id: faceArtworkDisc
-                            anchors.centerIn: parent
-                            width: parent.width * 0.52
-                            height: width
-                            radius: width / 2
-                            color: Colors.surfaceBright
-
-                            Image {
-                                id: coverImage
-                                anchors.fill: parent
-                                source: {
-                                    if (root.trackArt !== "") return root.trackArt;
-                                    if (root.wallpaperUrl !== "") return root.wallpaperUrl;
-                                    return "";
-                                }
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                                visible: source !== ""
-                            }
-
-                            Text {
-                                anchors.centerIn: parent
-                                visible: !coverImage.visible
-                                renderType: Text.NativeRendering
-                                font.hintingPreference: Font.PreferFullHinting
-                                text: Icons.player
-                                font.family: Icons.font
-                                font.pixelSize: 20
-                                color: Colors.overBackground
-                            }
-
-                            // Center spindle hole
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 10
-                                height: 10
-                                radius: 5
-                                color: "#0a0a0d"
-                                border.color: "#c0c0c8"
-                                border.width: 1.5
-                            }
-                        }
+                    StyledText {
+                        anchors.centerIn: parent
+                        visible: coverImage.status !== Image.Ready
+                        text: Icons.player
+                        font.family: Icons.font
+                        font.pixelSize: Styling.fontSize(6)
+                        color: Colors.overBackground
                     }
                 }
 
                 MouseArea {
-                    id: discMouse
+                    id: artworkMouse
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
@@ -350,7 +254,7 @@ Item {
                 }
 
                 StyledToolTip {
-                    show: discMouse.containsMouse
+                    show: artworkMouse.containsMouse
                     tooltipText: root.isPlaying ? "Click to Pause" : "Click to Play"
                 }
             }
@@ -403,10 +307,22 @@ Item {
             }
         }
 
+        LyricsView {
+            collapseWhenEmpty: true
+            Layout.fillWidth: true
+            Layout.preferredHeight: root.maximumHeight > 0
+                ? Math.max(0, Math.min(implicitHeight, root.maximumHeight - root.fixedContentHeight - mainCol.spacing))
+                : implicitHeight
+            mode: "detail"
+                lyricsEnabled: Config.bar?.lyricsEnabled ?? true
+            active: root.lyricsActive
+        }
+
         // ═══════════════════════════════════════════════════════════════
         // WAVEFORM PROGRESS BAR
         // ═══════════════════════════════════════════════════════════════
         IslandWaveformBar {
+            id: waveformRow
             Layout.fillWidth: true
             Layout.preferredHeight: 38
         }
@@ -415,6 +331,7 @@ Item {
         // PLAYBACK CONTROLS ROW
         // ═══════════════════════════════════════════════════════════════
         RowLayout {
+            id: playbackRow
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignHCenter
             spacing: 12

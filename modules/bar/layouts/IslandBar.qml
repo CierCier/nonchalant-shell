@@ -266,7 +266,6 @@ Item {
     }
 
     readonly property bool isMediaPlaying: MprisController.isPlaying && MprisController.activePlayer !== null
-
     readonly property string contextLabel: {
         if (root.isMediaPlaying) {
             return MprisController.trackTitle || "Playing";
@@ -586,8 +585,7 @@ Item {
         } else if (currentMode === "collapsed" && root.hasNotifications) {
             Qt.callLater(() => {
                 if (root.currentMode === "collapsed" && root.hasNotifications) {
-                    root.openedFromHidden = !root.barAlwaysVisible;
-                    root.currentMode = "notification";
+                    root.expand("notification");
                 }
             });
         }
@@ -1173,61 +1171,6 @@ Item {
                                     onClicked: root.expand("alerts")
                                 }
                             }
-
-                            // Separator before pin button
-                            Text {
-                                text: "|"
-                                color: Colors.overSurfaceVariant
-                                opacity: 0.5
-                                font.pixelSize: Styling.fontSize(-2)
-                                renderType: Text.NativeRendering
-                            }
-
-                            // Dynamic Island pin toggle button
-                            Item {
-                                id: pinBtn
-                                implicitWidth: 22
-                                implicitHeight: 22
-                                Layout.alignment: Qt.AlignVCenter
-
-                                StyledRect {
-                                    anchors.fill: parent
-                                    radius: 11
-                                    variant: pinMouse.containsMouse ? "focus" : "transparent"
-                                    scale: pinMouse.pressed ? 0.92 : 1.0
-                                    PressBehavior on scale {
-                                        pressed: pinMouse.pressed
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.isPinned ? Icons.pin : Icons.unpin
-                                        font.family: Icons.font
-                                        font.pixelSize: 13
-                                        color: root.isPinned ? Colors.primary : (pinMouse.containsMouse ? Colors.primary : Colors.overBackground)
-                                        opacity: root.isPinned ? 1.0 : (pinMouse.containsMouse ? 1.0 : 0.7)
-                                        renderType: Text.NativeRendering
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: pinMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (Config.bar) {
-                                            Config.bar.pinned = !root.isPinned;
-                                        }
-                                    }
-                                }
-
-                                StyledToolTip {
-                                    show: pinMouse.containsMouse
-                                    tooltipText: root.isPinned ? "Unpin Island" : "Pin Island"
-                                    description: root.isPinned ? "Autohide disabled (reserves window space)" : "Keep island visible and reserve window space"
-                                }
-                            }
                         }
                     }
                 }
@@ -1259,7 +1202,8 @@ Item {
                         width: parent.width
 
                         onDismissRequested: {
-                            root.collapse();
+                            if (root.currentMode === "notification")
+                                root.collapse();
                         }
                     }
                 }
@@ -1274,6 +1218,7 @@ Item {
                         id: dashboardView
                         screen: root.screen
                         width: parent.width
+                        lyricsActive: root.currentMode === "dashboard" && !root.retractingToHidden
                         height: implicitHeight
 
                         onOpenPower: root.expand("power")
@@ -1452,6 +1397,8 @@ Item {
                     IslandMediaCenterPanel {
                         id: mediaCenterView
                         width: parent.width
+                        maximumHeight: Math.max(0, root.screen.height - 32)
+                        lyricsActive: root.currentMode === "media" && !root.retractingToHidden
                         height: implicitHeight
 
                         onBackRequested: root.expand("dashboard")

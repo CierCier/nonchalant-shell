@@ -18,7 +18,7 @@ Item {
     readonly property bool hasPopups: popupCount > 0
     readonly property Item hitbox: (!isIsland && hasPopups) ? toastColumn : null
     readonly property int animMs: Config.animDuration > 0 ? Config.animDuration : 0
-    readonly property bool isIsland: (Config.bar?.style ?? "default") === "island"
+    readonly property bool isIsland: (Config.bar?.style ?? "default") === "island" || (Config.bar?.style ?? "default") === "pills"
     readonly property real cornerRadius: Styling.radius(4)
 
     visible: !isIsland && (hasPopups || exitingCount > 0)

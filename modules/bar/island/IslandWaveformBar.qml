@@ -14,9 +14,9 @@ Item {
     implicitWidth: 400
     implicitHeight: 38
 
-    readonly property real position: MprisController.activePlayer?.position ?? 0.0
-    readonly property real length: Math.max(1.0, MprisController.activePlayer?.length ?? 1.0)
-    readonly property real progress: Math.min(1.0, Math.max(0.0, root.position / root.length))
+    readonly property real position: MprisController.position
+    readonly property real length: MprisController.length
+    readonly property real progress: MprisController.progress
     readonly property bool isPlaying: MprisController.isPlaying
 
     property bool isDragging: false
@@ -24,7 +24,7 @@ Item {
     readonly property real displayProgress: isDragging ? dragProgress : root.progress
 
     property real phase: 0.0
-    property real currentAmplitude: (root.isPlaying ? 5.0 : 0.0)
+    property real currentAmplitude: (root.isPlaying ? 4.0 : 0.0)
     Behavior on currentAmplitude {
         NumberAnimation {
             duration: 350
@@ -49,17 +49,8 @@ Item {
         return mins + ":" + (secs < 10 ? "0" : "") + secs;
     }
 
-    Timer {
-        running: MprisController.isPlaying && !root.isDragging
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            MprisController.activePlayer?.positionChanged();
-        }
-    }
-
     function seekTo(fraction: real) {
-        if (!MprisController.activePlayer)
+        if (!MprisController.activePlayer || root.length <= 0)
             return;
         const player = MprisController.activePlayer;
         const targetPos = Math.max(0.0, Math.min(root.length, fraction * root.length));
@@ -97,7 +88,8 @@ Item {
                 id: waveMouseArea
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                enabled: root.length > 0 && (MprisController.activePlayer?.canSeek ?? false)
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                 preventStealing: root.isDragging
 
                 onPressed: mouse => {
@@ -139,7 +131,7 @@ Item {
                         return;
 
                     const centerY = h / 2;
-                    const strokeW = 3.5;
+                    const strokeW = 4.0;
                     const halfStroke = strokeW / 2;
                     const playedX = Math.max(halfStroke, Math.min(w - halfStroke, w * root.displayProgress));
 
@@ -166,12 +158,12 @@ Item {
                         ctx.lineCap = "round";
                         ctx.lineJoin = "round";
 
-                        const wavelength = 16.0;
+                        const wavelength = 24.0;
                         const k = (2 * Math.PI) / wavelength;
                         const amp = root.currentAmplitude;
                         const taperLen = Math.min(14.0, playedLen * 0.5);
 
-                        for (let x = playedStartX; x < playedX; x += 1.0) {
+                        const waveY = x => {
                             let envelope = 1.0;
                             if (taperLen > 0.001) {
                                 const distStart = x - playedStartX;
@@ -184,14 +176,19 @@ Item {
                                 }
                             }
 
-                            const waveY = centerY + amp * envelope * Math.sin((x - playedStartX) * k - root.phase);
-                            if (x === playedStartX) {
-                                ctx.moveTo(x, waveY);
-                            } else {
-                                ctx.lineTo(x, waveY);
-                            }
+                            return centerY + amp * envelope * Math.sin((x - playedStartX) * k - root.phase);
+                        };
+                        const slope = x => (waveY(x + 0.1) - waveY(x - 0.1)) / 0.2;
+
+                        ctx.moveTo(playedStartX, waveY(playedStartX));
+                        for (let x = playedStartX; x < playedX; x += 2.0) {
+                            const end = Math.min(x + 2.0, playedX);
+                            const third = (end - x) / 3;
+                            ctx.bezierCurveTo(
+                                x + third, waveY(x) + slope(x) * third,
+                                end - third, waveY(end) - slope(end) * third,
+                                end, waveY(end));
                         }
-                        ctx.lineTo(playedX, centerY);
                         ctx.stroke();
                     }
                 }
@@ -235,7 +232,7 @@ Item {
             Text {
                 renderType: Text.NativeRendering
                 font.hintingPreference: Font.PreferFullHinting
-                text: root.formatTime(root.length)
+                text: root.length > 0 ? root.formatTime(root.length) : "--:--"
                 font.family: Config.theme.monoFont
                 font.pixelSize: Styling.fontSize(-2)
                 color: Colors.overSurfaceVariant

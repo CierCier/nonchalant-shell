@@ -7,6 +7,49 @@ mode=${3:-dark}
 matugen_config=${4:?matugen config is required}
 output_path=${5:?output path is required}
 
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '%s\n' '{"error":"python3 is required for wallpaper colors"}' >&2
+  exit 127
+fi
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+mkdir -p -- "$(dirname -- "$output_path")"
+staging_dir=$(mktemp -d "${output_path}.XXXXXX")
+trap 'rm -rf -- "$staging_dir"' EXIT
+temporary_path="$staging_dir/colors.json"
+
+validate_palette() {
+  python3 - "$temporary_path" "$script_dir/../assets/matugen/colors.json" <<'PY'
+import json
+from pathlib import Path
+import re
+import sys
+
+try:
+    palette = json.loads(Path(sys.argv[1]).read_text())
+    expected = json.loads(Path(sys.argv[2]).read_text())
+    if not isinstance(palette, dict) or set(palette) != set(expected):
+        raise ValueError("Incomplete wallpaper palette")
+    if not all(isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value)
+               for value in palette.values()):
+        raise ValueError("Invalid wallpaper palette color")
+except (OSError, ValueError) as error:
+    print(json.dumps({"error": str(error)}), file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+if [[ $scheme == scheme-wallpaper ]]; then
+  if ! python3 -c 'from PIL import Image' >/dev/null 2>&1; then
+    printf '%s\n' '{"error":"Pillow is required for wallpaper colors"}' >&2
+    exit 127
+  fi
+  python3 "$script_dir/wallpaper_palette.py" "$image_path" "$mode" > "$temporary_path"
+  validate_palette
+  mv -- "$temporary_path" "$output_path"
+  exit 0
+fi
+
 # matugen 4.x refuses to pick a source color without a TTY unless --prefer
 # or --source-color-index is set. Quickshell Process has no TTY, so we must
 # pass a non-interactive preference or generation silently fails and the shell
@@ -14,33 +57,42 @@ output_path=${5:?output path is required}
 prefer=${MATUGEN_PREFER:-saturation}
 
 if command -v matugen >/dev/null 2>&1; then
+  # Give each invocation its own output; an old shared cache is never success.
+  python3 - "$matugen_config" "$staging_dir/config.toml" "$temporary_path" <<'PY'
+import json
+from pathlib import Path
+import re
+import sys
+
+config = Path(sys.argv[1]).resolve()
+text = config.read_text()
+text = re.sub(r'(?m)^input_path[ \t]*=[ \t]*"([^"]*)"[ \t]*$',
+              lambda match: "input_path = " + json.dumps(str(config.parent / match[1])), text)
+text = re.sub(r'(?m)^output_path\s*=.*$',
+              lambda match: "output_path = " + json.dumps(str(Path(sys.argv[3]).resolve())), text)
+Path(sys.argv[2]).write_text(text)
+PY
   args=(
     matugen image "$image_path"
     --prefer "$prefer"
     --source-color-index 0
-    -c "$matugen_config"
+    -c "$staging_dir/config.toml"
     -t "$scheme"
     -m "$mode"
   )
-  # Templates write to the path in config.toml (~/.cache/nonchalant/colors.json).
-  # Keep output_path for wallust fallback and for callers that pass it.
-  if "${args[@]}"; then
-    if [[ -f "$output_path" ]] || [[ -f "${HOME}/.cache/nonchalant/colors.json" ]]; then
-      # If the template wrote the standard cache path but the caller expected
-      # a different output_path, mirror it.
-      cache_path="${HOME}/.cache/nonchalant/colors.json"
-      if [[ -f "$cache_path" && "$output_path" != "$cache_path" ]]; then
-        mkdir -p "$(dirname "$output_path")"
-        cp -f "$cache_path" "$output_path"
-      fi
-      exit 0
-    fi
+  if "${args[@]}" && validate_palette; then
+    mv -- "$temporary_path" "$output_path"
+    exit 0
   fi
   echo "matugen failed; trying wallust fallback..." >&2
 fi
 
 if ! command -v wallust >/dev/null 2>&1; then
-  echo "Neither matugen nor wallust is installed; wallpaper colors were not generated." >&2
+  printf '%s\n' '{"error":"Neither matugen nor wallust is installed"}' >&2
+  exit 127
+fi
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' '{"error":"jq is required for the wallust fallback"}' >&2
   exit 127
 fi
 
@@ -54,13 +106,9 @@ mapfile -t palette < <(
 )
 
 if (( ${#palette[@]} < 16 )); then
-  echo "Wallust returned an incomplete wallpaper palette." >&2
+  printf '%s\n' '{"error":"Wallust returned an incomplete wallpaper palette"}' >&2
   exit 1
 fi
-
-mkdir -p "$(dirname "$output_path")"
-temporary_path=$(mktemp "${output_path}.XXXXXX")
-trap 'rm -f "$temporary_path"' EXIT
 
 # Elevated surfaces so chrome is not crushed pure black (hue tracks wallpaper).
 jq -n \
@@ -138,12 +186,6 @@ jq -n \
     sourceColor: $blue
   }' > "$temporary_path"
 
-mv "$temporary_path" "$output_path"
-trap - EXIT
-# Mirror into the path Colors.qml watches when different
-cache_path="${HOME}/.cache/nonchalant/colors.json"
-if [[ "$output_path" != "$cache_path" ]]; then
-  mkdir -p "$(dirname "$cache_path")"
-  cp -f "$output_path" "$cache_path"
-fi
+validate_palette
+mv -- "$temporary_path" "$output_path"
 echo "Generated Nonchalant colors with wallust (matugen is unavailable)."

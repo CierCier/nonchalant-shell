@@ -190,7 +190,7 @@ Item {
                         }
 
                         StyledToolTip {
-                            visible: actionMouse.containsMouse
+                            show: actionMouse.containsMouse
                             tooltipText: actionItem.modelData.label
                             delay: 500
                         }

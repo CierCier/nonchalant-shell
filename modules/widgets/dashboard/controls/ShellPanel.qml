@@ -15,6 +15,10 @@ Item {
     readonly property int contentWidth: Math.min(width, maxContentWidth)
     readonly property real sideMargin: (width - contentWidth) / 2
 
+    function resetScroll(): void {
+        mainFlickable.contentY = 0
+    }
+
     // Available color names for color picker
     readonly property var colorNames: Colors.availableColorNames
 
@@ -45,55 +49,7 @@ Item {
         colorPickerCurrentColor = color;
     }
 
-    property string currentSection: ""
-
-    component SectionButton: StyledRect {
-        id: sectionBtn
-        required property string text
-        required property string sectionId
-
-        property bool isHovered: false
-
-        variant: isHovered ? "focus" : "pane"
-        Layout.fillWidth: true
-        Layout.preferredHeight: 56
-        radius: Styling.radius(0)
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 16
-
-            Text {
-                renderType: Text.NativeRendering
-                font.hintingPreference: Font.PreferFullHinting
-                text: sectionBtn.text
-                font.family: Config.theme.font
-                font.pixelSize: Styling.fontSize(0)
-                font.bold: true
-                color: Colors.overBackground
-                Layout.fillWidth: true
-            }
-
-            Text {
-                renderType: Text.NativeRendering
-                font.hintingPreference: Font.PreferFullHinting
-                text: Icons.caretRight
-                font.family: Icons.font
-                font.pixelSize: 20
-                color: Colors.overSurfaceVariant
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onEntered: sectionBtn.isHovered = true
-            onExited: sectionBtn.isHovered = false
-            onClicked: root.currentSection = sectionBtn.sectionId
-        }
-    }
+    property string currentSection: "bar"
 
     component ActionButton: StyledRect {
         id: actionBtn
@@ -592,35 +548,6 @@ Item {
             width: mainFlickable.width
             spacing: 8
 
-            // Header wrapper
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: titlebar.height
-
-                PanelTitlebar {
-                    id: titlebar
-                    width: root.contentWidth
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    title: root.currentSection === "" ? "Shell" : (root.currentSection.charAt(0).toUpperCase() + root.currentSection.slice(1))
-
-                    actions: {
-                        if (root.currentSection !== "") {
-                            return [
-                                {
-                                    icon: Icons.arrowLeft,
-                                    tooltip: "Back",
-                                    onClicked: function () {
-                                        root.currentSection = "";
-                                    }
-                                }
-                            ];
-                        }
-
-                        return [];
-                    }
-                }
-            }
-
             // Content wrapper - centered
             Item {
                 Layout.fillWidth: true
@@ -631,32 +558,6 @@ Item {
                     width: root.contentWidth
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 16
-
-                    // ═══════════════════════════════════════════════════════════════
-                    // MENU SECTION
-                    // ═══════════════════════════════════════════════════════════════
-                    ColumnLayout {
-                        visible: root.currentSection === ""
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        SectionButton {
-                            text: "Bar"
-                            sectionId: "bar"
-                        }
-                        SectionButton {
-                            text: "Sidebar"
-                            sectionId: "sidebar"
-                        }
-                        SectionButton {
-                            text: "Lockscreen"
-                            sectionId: "lockscreen"
-                        }
-                        SectionButton {
-                            text: "System"
-                            sectionId: "system"
-                        }
-                    }
 
                     // ═══════════════════════════════════════════════════════════════
                     // BAR SECTION
@@ -689,6 +590,11 @@ Item {
                                     label: "Island",
                                     value: "island",
                                     icon: Icons.circle
+                                },
+                                {
+                                    label: "Pills",
+                                    value: "pills",
+                                    icon: Icons.dotsThree
                                 }
                             ]
                             value: Config.bar?.style ?? "default"
@@ -740,10 +646,32 @@ Item {
                                 }
                             }
                         }
+                        ToggleRow {
+                            label: "Show lyrics in the bar"
+                            checked: Config.bar.lyricsEnabled ?? true
+                            onToggled: value => {
+                                if (value !== Config.bar.lyricsEnabled) {
+                                    Config.bar.lyricsEnabled = value;
+                                }
+                            }
+                        }
+
+                        Text {
+                            renderType: Text.NativeRendering
+                            font.hintingPreference: Font.PreferFullHinting
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 8
+                            Layout.rightMargin: 8
+                            text: "When enabled, Nonchalant sends track metadata such as artist and title to LRCLIB to find matching lyrics."
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            color: Colors.overSurfaceVariant
+                            wrapMode: Text.Wrap
+                        }
 
                         ToggleRow {
-                            visible: (Config.bar?.style ?? "default") === "island"
-                            label: "Pin Dynamic Island"
+                            visible: (Config.bar?.style === "island" || Config.bar?.style === "pills")
+                            label: (Config.bar?.style === "pills") ? "Pin Floating Bar" : "Pin Dynamic Island"
                             checked: Config.bar.pinned ?? false
                             onToggled: value => {
                                 if (value !== Config.bar.pinned) {
@@ -806,6 +734,28 @@ Item {
                                     Config.lockscreen.position = newValue;
                                 }
                             }
+                        }
+                        ToggleRow {
+                            label: "Show lyrics on the lockscreen"
+                            checked: Config.lockscreen.lyricsEnabled ?? true
+                            onToggled: value => {
+                                if (value !== Config.lockscreen.lyricsEnabled) {
+                                    Config.lockscreen.lyricsEnabled = value;
+                                }
+                            }
+                        }
+
+                        Text {
+                            renderType: Text.NativeRendering
+                            font.hintingPreference: Font.PreferFullHinting
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 8
+                            Layout.rightMargin: 8
+                            text: "When enabled, Nonchalant sends track metadata such as artist and title to LRCLIB to find matching lyrics."
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            color: Colors.overSurfaceVariant
+                            wrapMode: Text.Wrap
                         }
                     }
 

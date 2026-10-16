@@ -14,55 +14,11 @@ Item {
     readonly property int contentWidth: Math.min(width, maxContentWidth)
     readonly property real sideMargin: (width - contentWidth) / 2
 
-    property string currentSection: ""
-
-    component SectionButton: StyledRect {
-        id: sectionBtn
-        required property string text
-        required property string sectionId
-
-        property bool isHovered: false
-
-        variant: isHovered ? "focus" : "pane"
-        Layout.fillWidth: true
-        Layout.preferredHeight: 56
-        radius: Styling.radius(0)
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 16
-
-            Text {
-                renderType: Text.NativeRendering
-                font.hintingPreference: Font.PreferFullHinting
-                text: sectionBtn.text
-                font.family: Config.theme.font
-                font.pixelSize: Styling.fontSize(0)
-                font.bold: true
-                color: Colors.overBackground
-                Layout.fillWidth: true
-            }
-
-            Text {
-                renderType: Text.NativeRendering
-                font.hintingPreference: Font.PreferFullHinting
-                text: Icons.caretRight
-                font.family: Icons.font
-                font.pixelSize: 20
-                color: Colors.overSurfaceVariant
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onEntered: sectionBtn.isHovered = true
-            onExited: sectionBtn.isHovered = false
-            onClicked: root.currentSection = sectionBtn.sectionId
-        }
+    function resetScroll(): void {
+        mainFlickable.contentY = 0
     }
+
+    property string currentSection: "weather"
 
     // Main content
     Flickable {
@@ -77,35 +33,6 @@ Item {
             width: mainFlickable.width
             spacing: 8
 
-            // Header wrapper
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: titlebar.height
-
-                PanelTitlebar {
-                    id: titlebar
-                    width: root.contentWidth
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    title: root.currentSection === "" ? "System" : (root.currentSection === "system" ? "System Resources" : (root.currentSection.charAt(0).toUpperCase() + root.currentSection.slice(1)))
-                    statusText: ""
-
-                    actions: {
-                        if (root.currentSection !== "") {
-                            return [
-                                {
-                                    icon: Icons.arrowLeft,
-                                    tooltip: "Back",
-                                    onClicked: function () {
-                                        root.currentSection = "";
-                                    }
-                                }
-                            ];
-                        }
-                        return [];
-                    }
-                }
-            }
-
             // Content wrapper - centered
             Item {
                 Layout.fillWidth: true
@@ -116,29 +43,6 @@ Item {
                     width: root.contentWidth
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 16
-
-                    // ═══════════════════════════════════════════════════════════════
-                    // MENU SECTION
-                    // ═══════════════════════════════════════════════════════════════
-                    ColumnLayout {
-                        visible: root.currentSection === ""
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        SectionButton {
-                            text: "Weather"
-                            sectionId: "weather"
-                        }
-                        SectionButton {
-                            text: "Performance"
-                            sectionId: "performance"
-                        }
-                        SectionButton {
-                            text: "System Resources"
-                            sectionId: "system"
-                        }
-                    }
-
 
                     // =====================
                     // WEATHER SECTION
@@ -482,7 +386,7 @@ Item {
                                         }
 
                                         StyledToolTip {
-                                            visible: removeDiskArea.containsMouse
+                                            show: removeDiskArea.containsMouse
                                             tooltipText: "Remove disk"
                                         }
                                     }

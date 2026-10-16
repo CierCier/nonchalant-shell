@@ -48,6 +48,7 @@ declare -A BINARY_CHECK=(
 
   ["jq"]="jq"
   ["playerctl"]="playerctl"
+  ["yt-dlp"]="yt-dlp"
   ["wtype"]="wtype"
   ["mpvpaper"]="mpvpaper"
   ["pipx"]="pipx"
@@ -113,13 +114,13 @@ install_dependencies() {
 
     local PKGS=(
       kitty tmux fuzzel network-manager-applet blueman
-      pipewire wireplumber playerctl
+      pipewire wireplumber playerctl yt-dlp
       qt6-qtbase qt6-qtdeclarative qt6-qtwayland qt6-qtsvg qt6-qttools
       qt6-qtimageformats qt6-qtmultimedia qt6-qtshadertools
       kf6-syntax-highlighting kf6-breeze-icons hicolor-icon-theme
       brightnessctl ddcutil fontconfig jq sqlite upower
       wl-clipboard wlsunset wtype glib2 pipx zenity power-profiles-daemon
-      python3.12 libnotify flatpak
+      python3.12 python3-pillow libnotify flatpak
       jetbrains-mono-fonts dejavu-sans-fonts liberation-fonts
       google-noto-fonts-common google-noto-cjk-fonts google-noto-emoji-fonts
       mpvpaper matugen R-CRAN-phosphoricons adw-gtk3-theme quickshell unzip curl
@@ -155,12 +156,12 @@ install_dependencies() {
 
     local PKGS=(
       kitty tmux fuzzel network-manager-applet blueman
-      pipewire wireplumber pavucontrol ffmpeg x264 playerctl
+      pipewire wireplumber pavucontrol ffmpeg x264 playerctl yt-dlp
       qt6-base qt6-declarative qt6-wayland qt6-svg qt6-tools qt6-imageformats qt6-multimedia qt6-shadertools
       libwebp libavif syntax-highlighting breeze-icons hicolor-icon-theme
       brightnessctl ddcutil fontconfig jq sqlite upower
       wl-clipboard wlsunset wtype glib2 python-pipx zenity inetutils power-profiles-daemon
-      python312 libnotify
+      python312 python-pillow libnotify
       ttf-jetbrains-mono ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji
       ttf-nerd-fonts-symbols
       matugen wl-clip-persist mpvpaper

@@ -14,8 +14,8 @@ StyledRect {
     variant: "bg"
 
     property bool isPlaying: MprisController.activePlayer?.playbackState === MprisPlaybackState.Playing
-    property real position: MprisController.activePlayer?.position ?? 0.0
-    property real length: MprisController.activePlayer?.length ?? 1.0
+    property real position: MprisController.position
+    property real length: MprisController.length
     property bool hasArtwork: (MprisController.activePlayer?.trackArtUrl ?? "") !== ""
     property string wallpaperPath: {
         if (!GlobalStates.wallpaperManager) return "";
@@ -25,8 +25,9 @@ StyledRect {
     }
 
     visible: MprisController.activePlayer !== null
-    height: 96
-    radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
+    implicitHeight: contentLayout.implicitHeight + contentLayout.anchors.topMargin + contentLayout.anchors.bottomMargin
+    height: implicitHeight
+    radius: Styling.radius(0)
     backgroundOpacity: (MprisController.activePlayer || wallpaperPath !== "") ? 0.0 : 1.0
 
     Behavior on backgroundOpacity {
@@ -79,27 +80,6 @@ StyledRect {
         }
     }
 
-    Timer {
-        running: lockPlayer.isPlaying && lockPlayer.visible
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            if (!positionSlider.isDragging) {
-                positionSlider.value = lockPlayer.length > 0 ? Math.min(1.0, lockPlayer.position / lockPlayer.length) : 0;
-            }
-            MprisController.activePlayer?.positionChanged();
-        }
-    }
-
-    Connections {
-        target: MprisController.activePlayer
-        function onPositionChanged() {
-            if (!positionSlider.isDragging && MprisController.activePlayer) {
-                positionSlider.value = lockPlayer.length > 0 ? Math.min(1.0, lockPlayer.position / lockPlayer.length) : 0;
-            }
-        }
-    }
-
     Item {
         id: noPlayerContainer
         anchors.fill: parent
@@ -143,15 +123,6 @@ StyledRect {
         visible: MprisController.activePlayer || wallpaperPath !== ""
 
         // Album artwork con botón de play/pause superpuesto
-    Connections {
-        target: MprisController
-        function onActivePlayerChanged() {
-            if (!MprisController.activePlayer) {
-                positionSlider.value = 0;
-            }
-        }
-    }
-
     Item {
 
             Layout.preferredWidth: 64
@@ -289,6 +260,15 @@ StyledRect {
                     visible: text !== ""
                     opacity: 0.7
                 }
+                LyricsView {
+                    collapseWhenEmpty: true
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: implicitHeight
+                    mode: "compact"
+                    lyricsEnabled: Config.lockscreen?.lyricsEnabled ?? true
+                    active: GlobalStates.lockscreenVisible && !GlobalStates.lockscreenUnlocking
+                }
+
             }
 
             // Controles

@@ -11,11 +11,33 @@ ToolTip {
     property string tooltipText: ""
     property string description: ""
     property bool show: false
+    // Drag-value tips can follow a pointer grab outside the owner.
+    property bool requireHover: true
+
+    // Popup content is reparented to the window overlay, so owner state must gate it.
+    function ownerAvailable(): bool {
+        let owner = root.parent;
+        if (!owner)
+            return false;
+        while (owner) {
+            if (!owner.visible || !owner.enabled || owner.opacity <= 0)
+                return false;
+            owner = owner.parent;
+        }
+        return true;
+    }
+
+    HoverHandler {
+        id: ownerHover
+        parent: root.parent
+        enabled: root.requireHover && (parent?.visible ?? false) && (parent?.enabled ?? false)
+    }
 
     text: tooltipText
     delay: 1000
     timeout: -1
-    visible: show && tooltipText.length > 0
+    visible: root.show && root.ownerAvailable() && (!root.requireHover || ownerHover.hovered)
+        && root.tooltipText.length > 0
 
     background: StyledRect {
         variant: "popup"
