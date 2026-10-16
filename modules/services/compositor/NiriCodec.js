@@ -40,7 +40,7 @@ function normalize(windows, workspaces, outputs, overviewOpen) {
             || (window.floating_window_size ? [window.floating_window_size.width, window.floating_window_size.height] : null)
             || (window.metadata ? [window.metadata.width, window.metadata.height] : null)
             || [100, 100];
-        
+
 
         if (workspace)
             workspace.windows += 1;
