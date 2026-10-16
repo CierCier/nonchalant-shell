@@ -227,6 +227,28 @@ def exercise(session, source, args, passed):
                 if args.style == "island" else not shell_state()[field]))
             time.sleep(0.7)
             passed.append(f"{command} opens and reverse toggle dismisses")
+    if shell and args.style == "left":
+        for mode in ("wifi", "sound", "mic", "bluetooth", "battery", "media", "stats"):
+            session.ipc(shell, "nonchalant", "run", "dashboard")
+            session.wait("dashboard before control menu", lambda: shell_state()["dashboardOpen"])
+            session.ipc(shell, "nonchalant", "run", mode)
+            session.wait(f"{mode} opens its own panel", lambda:
+                shell_state()["controlMenu"] == mode)
+            if mode == "stats":
+                session.wait("system monitor sampling enabled", lambda: shell_state()["systemMonitorOpen"])
+            time.sleep(0.7)
+            session.run(["grim", str(session.root / f"control-{mode}.png")])
+            session.ipc(shell, "nonchalant", "run", mode)
+            session.wait(f"{mode} reverse toggle dismisses", lambda: not shell_state()["popupOpen"])
+            if mode == "stats":
+                session.wait("system monitor sampling released", lambda: not shell_state()["systemMonitorOpen"])
+        session.ipc(shell, "nonchalant", "run", "sound")
+        session.wait("sound menu", lambda: shell_state()["controlMenu"] == "sound")
+        session.ipc(shell, "nonchalant", "run", "mic")
+        session.wait("mic replaces sound", lambda: shell_state()["controlMenu"] == "mic")
+        session.ipc(shell, "nonchalant", "run", "mic")
+        session.wait("control menus dismissed", lambda: not shell_state()["popupOpen"])
+        passed.append("vertical control menus replace dashboard, switch, and reverse-toggle closed")
     client = session.start("client", [session.quickshell, "-p", str(private_source / "compositor-client.qml")])
     if args.baseline:
         time.sleep(2)

@@ -261,6 +261,23 @@ Item {
                     }
 
                     DockIconButton {
+                        id: mediaButton
+                        visible: MprisController.activePlayer !== null
+                        iconText: Icons.disc
+                        selected: MprisController.isPlaying
+                        tooltipText: MprisController.trackTitle || "Media"
+                        description: "Click for player · Right-click to play/pause · Scroll to skip"
+                        onClicked: clock.openControlMenu("media")
+                        onSecondaryClicked: MprisController.togglePlaying()
+                        onScrolled: delta => {
+                            if (delta > 0)
+                                MprisController.previous();
+                            else if (delta < 0)
+                                MprisController.next();
+                        }
+                    }
+
+                    DockIconButton {
                         visible: SystemTray.items.values.length > 0
                         iconText: root.trayExpanded ? Icons.caretDown : Icons.caretUp
                         tooltipText: root.trayExpanded ? "Hide tray" : "Show tray"
@@ -289,20 +306,31 @@ Item {
                     }
 
                     DockIconButton {
+                        id: networkButton
                         iconText: root.networkIcon
                         tooltipText: root.networkTooltip
-                        description: "Open dashboard quick controls"
-                        onClicked: clock.toggleCenterMenu()
+                        description: "Open network menu"
+                        onClicked: clock.openControlMenu("wifi")
                     }
 
                     DockIconButton {
-                        visible: Audio.sink !== null
+                        iconText: !BluetoothService.enabled ? Icons.bluetoothOff
+                            : (BluetoothService.connected ? Icons.bluetoothConnected : Icons.bluetooth)
+                        muted: !BluetoothService.enabled
+                        tooltipText: !BluetoothService.enabled ? "Bluetooth off"
+                            : (BluetoothService.firstConnectedDeviceName || "Bluetooth")
+                        description: "Open Bluetooth menu"
+                        onClicked: clock.openControlMenu("bluetooth")
+                    }
+
+                    DockIconButton {
+                        id: soundButton
                         iconText: Audio.sink?.audio?.muted ? Icons.speakerSlash : Icons.speakerHigh
                         muted: Audio.sink?.audio?.muted ?? false
                         tooltipText: (muted ? "Muted" : "Volume " + Math.round(Audio.value * 100) + "%")
-                        description: "Click to mute · Scroll to adjust"
-                        onClicked: Audio.toggleMute()
-                        onSecondaryClicked: clock.toggleCenterMenu()
+                        description: "Click for sound · Right-click to mute · Scroll to adjust"
+                        onClicked: clock.openControlMenu("sound")
+                        onSecondaryClicked: Audio.toggleMute()
                         onScrolled: delta => {
                             if (delta !== 0)
                                 Audio.setVolume(Math.max(0, Math.min(1, Audio.value + (delta > 0 ? 0.05 : -0.05))));
@@ -310,13 +338,13 @@ Item {
                     }
 
                     DockIconButton {
-                        visible: Audio.source !== null
+                        id: micButton
                         iconText: Audio.source?.audio?.muted ? Icons.micSlash : Icons.mic
                         muted: Audio.source?.audio?.muted ?? false
                         tooltipText: muted ? "Microphone muted" : "Microphone " + Math.round((Audio.source?.audio?.volume ?? 0) * 100) + "%"
-                        description: "Click to mute · Scroll to adjust"
-                        onClicked: Audio.toggleMicMute()
-                        onSecondaryClicked: clock.toggleCenterMenu()
+                        description: "Click for microphone · Right-click to mute · Scroll to adjust"
+                        onClicked: clock.openControlMenu("mic")
+                        onSecondaryClicked: Audio.toggleMicMute()
                         onScrolled: delta => {
                             if (delta !== 0)
                                 Audio.setMicVolume(Math.max(0, Math.min(1, (Audio.source?.audio?.volume ?? 0) + (delta > 0 ? 0.05 : -0.05))));
@@ -327,6 +355,8 @@ Item {
                         Layout.alignment: Qt.AlignHCenter
                         flat: true
                         showMeter: false
+                        usePopup: false
+                        onActivated: clock.openControlMenu("battery")
                         meterSize: root.controlSize
                         bar: root
                     }

@@ -44,23 +44,47 @@ Item {
             + remainder.toString().padStart(2, "0");
     }
 
+    property string controlMode: ""
+    readonly property bool systemMonitorActive: root.vertical && dashboardPopup.isOpen && root.controlMode === "stats"
+
+    onSystemMonitorActiveChanged: {
+        const screenName = root.bar?.screen?.name ?? "";
+        if (root.systemMonitorActive)
+            GlobalStates.systemMonitorPopupScreen = screenName;
+        else if (GlobalStates.systemMonitorPopupScreen === screenName)
+            GlobalStates.systemMonitorPopupScreen = "";
+    }
+
+    function openControlMenu(mode: string): void {
+        if (!root.vertical)
+            return;
+        if (dashboardPopup.isOpen && root.controlMode === mode) {
+            dashboardPopup.close();
+            return;
+        }
+        root.controlMode = mode;
+        dashboardPopup.open();
+    }
+
     function toggleCenterMenu() {
-        if (dashboardPopup.isOpen) {
+        if (dashboardPopup.isOpen && (!root.vertical || root.controlMode === "")) {
             dashboardPopup.close();
             return;
         }
 
+        root.controlMode = "";
         GlobalStates.dashboardCurrentTab = 0;
         // claimBarPopup closes any sibling popup (e.g. weather) in the same turn.
         dashboardPopup.open();
     }
 
     function toggleWallpapers() {
-        if (dashboardPopup.isOpen && GlobalStates.dashboardCurrentTab === 1) {
+        if (dashboardPopup.isOpen && GlobalStates.dashboardCurrentTab === 1 && (!root.vertical || root.controlMode === "")) {
             dashboardPopup.close();
             return;
         }
 
+        root.controlMode = "";
         GlobalStates.dashboardCurrentTab = 1;
         dashboardPopup.open();
     }
@@ -596,6 +620,7 @@ Item {
         parent: root.bar
 
         property bool isOpen: false
+        readonly property string menuMode: root.vertical ? root.controlMode : ""
         readonly property bool bottomBar: !leftBar && (Config.bar?.position ?? "top") === "bottom"
         readonly property bool leftBar: (Config.bar?.style ?? "default") === "left"
         readonly property int edgeGap: 8
@@ -646,6 +671,8 @@ Item {
         MorphSurface {
             id: dashboardSurface
 
+            variant: root.vertical && !root.controlMode ? "transparent" : "popup"
+            padding: root.vertical && !root.controlMode ? 0 : 8
             shown: dashboardPopup.isOpen
             contentWidth: dashboardLoader.item ? dashboardLoader.item.implicitWidth + padding * 2 : 916
             contentHeight: dashboardLoader.item ? dashboardLoader.item.implicitHeight + padding * 2 : 360
@@ -660,8 +687,34 @@ Item {
                 // Always warm: weather→dashboard must not hitch on first create.
                 active: true
                 anchors.fill: parent
+                onLoaded: {
+                    if (dashboardPopup.isOpen)
+                        Qt.callLater(() => dashboardLoader.item?.focusCurrentTab());
+                }
 
-                sourceComponent: Component {
+                sourceComponent: root.vertical
+                    ? (root.controlMode ? verticalControlMenu : verticalDashboard)
+                    : horizontalDashboard
+
+                Component {
+                    id: verticalControlMenu
+                    VerticalControlMenu {
+                        mode: root.controlMode
+                        onBackRequested: root.toggleCenterMenu()
+                        onCloseRequested: dashboardPopup.close()
+                    }
+                }
+
+                Component {
+                    id: verticalDashboard
+                    VerticalDashboard {
+                        screenName: root.bar?.screen?.name ?? ""
+                        onCloseRequested: dashboardPopup.close()
+                    }
+                }
+
+                Component {
+                    id: horizontalDashboard
                     DashboardView {
                         screenName: root.bar?.screen?.name ?? ""
                         popupMode: true
@@ -713,6 +766,8 @@ Item {
             Visibilities.unregisterDashboardController(screenName, root);
         if (GlobalStates.dashboardPopupScreen === screenName)
             GlobalStates.dashboardPopupScreen = "";
+        if (GlobalStates.systemMonitorPopupScreen === screenName)
+            GlobalStates.systemMonitorPopupScreen = "";
     }
 
     Component.onCompleted: {

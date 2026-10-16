@@ -20,6 +20,8 @@ Item {
                 launcherOpen: GlobalStates.launcherOpen,
                 dashboardOpen: GlobalStates.dashboardOpen,
                 popupOpen: Visibilities.activeBarPopup?.isOpen ?? false,
+                systemMonitorOpen: GlobalStates.systemMonitorOpen,
+                controlMenu: Visibilities.activeBarPopup?.menuMode ?? "",
                 powerOpen: Visibilities.powerMenuButtons[outputName]?.popupOpen ?? false,
                 hasActiveGrab: FocusGrabManager.hasActiveGrab,
                 settingsVisible: GlobalStates.settingsWindowVisible,

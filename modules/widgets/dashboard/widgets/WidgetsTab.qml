@@ -1,4 +1,5 @@
 import QtQuick
+import qs.config
 import QtQuick.Layouts
 import Quickshell.Widgets
 import qs.modules.theme
@@ -7,19 +8,20 @@ import qs.modules.globals
 import qs.modules.services
 import "calendar"
 
-Rectangle {
+Item {
     id: root
     property bool lyricsActive: false
-
-    color: "transparent"
     implicitWidth: 544
-    implicitHeight: 750
+    implicitHeight: Config.bar?.style === "left"
+        ? quickControls.implicitHeight + scrollColumn.spacing + quickControls.implicitWidth
+        : 750
 
     RowLayout {
         anchors.fill: parent
         spacing: 8
 
         FullPlayer {
+            visible: Config.bar?.style !== "left"
             Layout.preferredWidth: 216
             lyricsActive: root.lyricsActive
             Layout.fillHeight: true
@@ -66,6 +68,7 @@ Rectangle {
                     }
 
                     StyledRect {
+                        visible: Config.bar?.style !== "left"
                         variant: "pane"
                         Layout.fillWidth: true
                         Layout.preferredHeight: settingsInner.implicitHeight + 8

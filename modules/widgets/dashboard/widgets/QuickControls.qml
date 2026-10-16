@@ -15,6 +15,8 @@ StyledRect {
     implicitHeight: columnLayout.implicitHeight + 8
     radius: Styling.radius(4)
 
+    readonly property bool verticalBar: Config.bar?.style === "left"
+
     property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth, 2: GPU
 
     onVisibleChanged: {
@@ -46,6 +48,27 @@ StyledRect {
                 spacing: 4
 
                 ControlButton {
+                    visible: root.verticalBar
+                    Layout.preferredWidth: 48
+                    Layout.preferredHeight: 48
+                    iconName: Icons.gear
+                    isActive: GlobalStates.settingsWindowVisible
+                    tooltipText: "Settings"
+                    onClicked: GlobalShortcuts.toggleSettings()
+                }
+
+                ControlButton {
+                    visible: root.verticalBar
+                    Layout.preferredWidth: 48
+                    Layout.preferredHeight: 48
+                    iconName: Icons.circuitry
+                    isActive: GlobalStates.systemMonitorOpen
+                    tooltipText: "System Monitor"
+                    onClicked: GlobalShortcuts.run("system-monitor")
+                }
+
+                ControlButton {
+                    visible: !root.verticalBar
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
                     iconName: {
@@ -73,6 +96,7 @@ StyledRect {
                 }
 
                 ControlButton {
+                    visible: !root.verticalBar
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
                     iconName: {
