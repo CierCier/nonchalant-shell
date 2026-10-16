@@ -289,7 +289,7 @@ StyledRect {
             Layout.fillWidth: true
             Layout.preferredHeight: 22
             mode: "compact"
-            lyricsEnabled: Config.bar.lyricsEnabled
+                    lyricsEnabled: Config.bar?.lyricsEnabled ?? true
             active: root.lyricsActive
         }
 

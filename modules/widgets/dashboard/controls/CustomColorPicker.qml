@@ -249,13 +249,13 @@ Popup {
                     radius: height / 2
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position: 0; color: "red" }
-                        GradientStop { position: 0.1667; color: "magenta" }
-                        GradientStop { position: 0.3333; color: "blue" }
-                        GradientStop { position: 0.5; color: "cyan" }
-                        GradientStop { position: 0.6667; color: "green" }
-                        GradientStop { position: 0.8333; color: "yellow" }
-                        GradientStop { position: 1; color: "red" }
+                        GradientStop { position: 0; color: Qt.hsva(0, 1, 1, 1) }
+                        GradientStop { position: 0.1667; color: Qt.hsva(0.1667, 1, 1, 1) }
+                        GradientStop { position: 0.3333; color: Qt.hsva(0.3333, 1, 1, 1) }
+                        GradientStop { position: 0.5; color: Qt.hsva(0.5, 1, 1, 1) }
+                        GradientStop { position: 0.6667; color: Qt.hsva(0.6667, 1, 1, 1) }
+                        GradientStop { position: 0.8333; color: Qt.hsva(0.8333, 1, 1, 1) }
+                        GradientStop { position: 1; color: Qt.hsva(1, 1, 1, 1) }
                     }
                 }
             }

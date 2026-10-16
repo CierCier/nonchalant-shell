@@ -6,6 +6,28 @@ import qs.config
 
 FileView {
     id: colors
+
+    function withAlpha(value: color, alpha: real): color {
+        return Qt.rgba(value.r, value.g, value.b, alpha);
+    }
+
+    // All selected controls share the same palette role.
+    function accentRole(module: string): string {
+        return "primary";
+    }
+
+    function metricRole(metric: string, usage: real): string {
+        switch (metric) {
+        case "cpu":
+            return usage >= 90 ? "red" : (usage >= 70 ? "yellow" : "primary");
+        case "disk":
+            return usage >= 90 ? "red" : (usage >= 75 ? "yellow" : "primary");
+        case "memory": return "blue";
+        case "gpu": return "yellow";
+        case "network": return "green";
+        default: return "primary";
+        }
+    }
     // QUICKSHELL-GIT: path: Quickshell.cachePath("colors.json")
     path: Quickshell.env("HOME") + "/.cache/nonchalant/colors.json"
     preload: true

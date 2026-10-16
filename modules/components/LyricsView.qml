@@ -9,7 +9,7 @@ Item {
     id: root
 
     property string mode: "compact"
-    property bool lyricsEnabled: Config.bar.lyricsEnabled
+    property bool lyricsEnabled: Config.bar?.lyricsEnabled ?? true
     property bool active: false
     property bool subscribed: false
     property bool collapseWhenEmpty: false

@@ -27,25 +27,85 @@ ShellRoot {
         SettingsTab { id: settings; anchors.fill: parent }
         ThemePanel { id: compactTheme; width: 1000; visible: false }
         LyricsView { id: lyrics; width: 200; height: 22 }
+        CustomColorPicker { id: picker; parent: settings }
         TestCase {
             name: "SettingsLyricsRuntime"
             when: Config.initialLoadComplete
+
+            function initTestCase() {
+                // Construct pages synchronously in QtTest's nested event loop.
+                findChild(settings, "settingsPanelLoader").asynchronous = false
+            }
+
+            function expectPage(pageId) {
+                const loader = findChild(settings, "settingsPanelLoader")
+                compare(settings.currentPageId, pageId)
+                compare(String(loader.source), settings.pageFor(pageId).component)
+                tryCompare(loader, "status", Loader.Ready, 5000)
+                tryCompare(settings, "loadedPageId", pageId, 5000)
+            }
+
+            function test_search_navigation_follows_display_order() {
+                for (const query of ["a", "s", "color", "system", "lyrics"]) {
+                    settings.searchQuery = query
+                    const rows = settings.sidebarRows.filter(row => !row.heading)
+                    compare(rows.length, settings.searchResults.length)
+                    for (let index = 0; index < rows.length; index++) {
+                        compare(rows[index].resultIndex, index, query + ": keyboard order must match rows")
+                        compare(settings.searchResults[index].pageId, rows[index].pageId)
+                        compare(settings.searchCursor, index)
+                        settings.moveSearchCursor(1)
+                    }
+                    compare(settings.searchCursor, 0, "Down wraps after the last visible result")
+                }
+                settings.searchQuery = ""
+                console.log("SETTINGS_SEARCH_ORDER_PASSED")
+            }
+
+            function test_color_picker_hues_match_selection() {
+                function hueSlider(item) {
+                    if (item.to === 360 && item.from === 0) return item
+                    for (const child of item.children ?? []) {
+                        const found = hueSlider(child)
+                        if (found) return found
+                    }
+                    return null
+                }
+                picker.open()
+                picker.saturation = 1
+                picker.value = 1
+                picker.alpha = 1
+                const slider = hueSlider(picker.contentItem)
+                verify(slider !== null)
+                const stops = slider.background.children[0].gradient.stops
+                compare(stops.length, 7)
+                for (const stop of stops) {
+                    const expected = Qt.hsva(stop.position, 1, 1, 1)
+                    verify(Math.abs(stop.color.r - expected.r) < 0.002)
+                    verify(Math.abs(stop.color.g - expected.g) < 0.002)
+                    verify(Math.abs(stop.color.b - expected.b) < 0.002)
+                    picker.hue = stop.position * 360
+                    compare(picker.selectedColor, expected)
+                }
+                picker.close()
+                console.log("SETTINGS_COLOR_HUES_PASSED")
+            }
             function test_independent_settings_and_lyrics() {
                 verify(Config.desktop === undefined)
                 settings.go("shell", "bar")
-                tryCompare(settings, "loadedPageId", "shell", 5000)
+                expectPage("shell")
                 compare(settings.currentTabId, "bar")
                 settings.go("audio", "")
-                tryCompare(settings, "loadedPageId", "audio", 5000)
+                expectPage("audio")
                 settings.back()
-                tryCompare(settings, "loadedPageId", "shell", 5000)
+                expectPage("shell")
                 compare(settings.currentPageId, "shell")
                 compare(settings.currentTabId, "bar")
                 settings.forward()
-                tryCompare(settings, "loadedPageId", "audio", 5000)
+                expectPage("audio")
                 compare(settings.currentPageId, "audio")
                 GlobalStates.openSettings("theme", "colors")
-                tryCompare(settings, "loadedPageId", "theme", 5000)
+                expectPage("theme")
                 compare(settings.currentTabId, "colors")
                 settings.searchQuery = "lyrics"
                 verify(settings.searchResults.some(result => result.tabId === "bar"))
@@ -77,7 +137,7 @@ ShellRoot {
                     const tabs = page.tabs.length > 0 ? page.tabs.map(tab => tab.id) : [""]
                     for (const tabId of tabs) {
                         settings.go(pageId, tabId)
-                        tryCompare(settings, "loadedPageId", pageId, 5000)
+                        expectPage(pageId)
                         for (const availableWidth of [1600, 900, 680]) {
                             settings.width = availableWidth
                             tryVerify(() => loader.width > 0 && loader.item.contentWidth === loader.width, 1000)
@@ -86,7 +146,7 @@ ShellRoot {
                     }
                 }
                 settings.go("theme", "colors")
-                tryCompare(settings, "loadedPageId", "theme", 5000)
+                expectPage("theme")
                 loader.item.openColorPicker(["background", "primary"], "background", "Select Color", () => {})
                 compare(loader.item.colorPickerActive, true)
                 settings.width = 1600
@@ -147,6 +207,8 @@ class SettingsLyricsRuntimeTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, output)
             self.assertIn("SETTINGS_LYRICS_RUNTIME_PASSED", output, output)
             self.assertIn("SETTINGS_LAYOUT_RUNTIME_PASSED", output, output)
+            self.assertIn("SETTINGS_SEARCH_ORDER_PASSED", output, output)
+            self.assertIn("SETTINGS_COLOR_HUES_PASSED", output, output)
             self.assertNotIn("SETTINGS_LYRICS_RUNTIME_TIMEOUT", output, output)
             self.assertNotIn("FAIL!", output, output)
 

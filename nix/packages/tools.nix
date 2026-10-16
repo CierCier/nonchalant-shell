@@ -10,7 +10,7 @@ with pkgs; [
 
   libnotify
   matugen
-  python3
+  (python3.withPackages (ps: [ ps.pillow ]))
   power-profiles-daemon
   sqlite
   upower

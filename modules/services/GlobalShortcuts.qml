@@ -52,6 +52,9 @@ Singleton {
             case "wallpapers":
                 toggleWallpapers();
                 break;
+            case "wallpaper-colors":
+                GlobalStates.wallpaperManager?.setMatugenScheme("scheme-wallpaper");
+                break;
             case "powermenu":
             case "power":
                 Visibilities.togglePowerMenuForActive();

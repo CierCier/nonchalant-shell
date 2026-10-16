@@ -1,3 +1,7 @@
+import hashlib
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -61,6 +65,46 @@ class LyricsTests(unittest.TestCase):
         second = {**first, "artistName": "Second Artist"}
         with patch.object(lyrics, "ask", return_value=[first, second]):
             self.assertIsNone(lyrics.lookup("", "Home", "", 200, video=True))
+
+    def test_unknown_video_duration_keeps_only_plain_words(self):
+        song = {
+            "trackName": "Home", "artistName": "Artist", "duration": 200,
+            "syncedLyrics": "[00:01]First\n[00:02]Last",
+        }
+        for artist in ("", "Artist"):
+            with self.subTest(artist=artist), patch.object(lyrics, "ask", return_value=[song]):
+                result = lyrics.parse(lyrics.lookup(artist, "Home", "", 0, video=True))
+            self.assertFalse(result["synced"])
+            self.assertEqual(result["lines"], [{"t": -1, "text": "First"}, {"t": -1, "text": "Last"}])
+
+    def test_late_matching_video_duration_restores_synchronized_words(self):
+        song = {
+            "trackName": "Home", "artistName": "Artist", "duration": 200,
+            "syncedLyrics": "[00:01]First\n[00:02]Last",
+        }
+        with patch.object(lyrics, "ask", return_value=[song]):
+            result = lyrics.parse(lyrics.lookup("", "Home", "", 200, video=True))
+        self.assertTrue(result["synced"])
+        self.assertEqual([line["t"] for line in result["lines"]], [1, 2])
+
+    def test_old_video_cache_does_not_restore_unverified_timing(self):
+        song = {"trackName": "Home", "artistName": "Artist", "duration": 200,
+                "syncedLyrics": "[00:01]First"}
+        signature = "youtube-v1\nArtist\nHome\n\n0"
+        with tempfile.TemporaryDirectory() as directory:
+            old_cache = Path(directory) / (hashlib.sha1(signature.encode()).hexdigest() + ".json")
+            old_cache.write_text(json.dumps(lyrics.parse(song)))
+            with patch.object(lyrics, "cache_dir", return_value=directory), \
+                    patch.object(lyrics, "ask", return_value=[song]) as ask:
+                result = lyrics.report("Artist - Topic", "Home", "", 0,
+                                       "https://music.youtube.com/watch?v=example")
+                self.assertFalse(result["synced"])
+                ask.assert_called_once()
+                ask.reset_mock()
+                cached = lyrics.report("Artist - Topic", "Home", "", 0,
+                                       "https://music.youtube.com/watch?v=example")
+                self.assertEqual(cached, result)
+                ask.assert_not_called()
 
     def test_native_lookup_still_rejects_a_different_recording_duration(self):
         song = {

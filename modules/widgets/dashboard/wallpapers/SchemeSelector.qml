@@ -13,6 +13,7 @@ Item {
     id: root
     property bool schemeListExpanded: false
     readonly property var matugenSchemes: [
+        "scheme-wallpaper",
         "scheme-content",
         "scheme-expressive",
         "scheme-fidelity",
@@ -154,6 +155,7 @@ Item {
 
     function getSchemeDisplayName(scheme) {
         const map = {
+            "scheme-wallpaper": "Wallpaper",
             "scheme-content": "Content",
             "scheme-expressive": "Expressive",
             "scheme-fidelity": "Fidelity",

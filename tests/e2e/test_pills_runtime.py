@@ -1,0 +1,168 @@
+"""Exercise pills transitions and feedback in an isolated Quickshell process."""
+
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[2]
+QML = r'''
+import QtQuick
+import QtTest
+import Quickshell
+import qs.config
+import qs.modules.bar.layouts
+import qs.modules.services
+import qs.modules.theme
+
+ShellRoot {
+    FloatingWindow {
+        visible: true
+        implicitWidth: 1200
+        implicitHeight: 900
+        PillsBar { id: bar; screen: Quickshell.screens[0] }
+        TestCase {
+            name: "PillsRuntime"
+            when: Config.initialLoadComplete
+
+            function childOfType(item, type) {
+                if (String(item).startsWith(type)) return item
+                for (const child of item.children ?? []) {
+                    const found = childOfType(child, type)
+                    if (found) return found
+                }
+                return null
+            }
+
+            function init() {
+                Notifications.popupList = []
+                Config.bar.pinned = true
+                NiriService.overviewOpen = false
+                bar.collapse()
+                tryCompare(bar, "currentMode", "collapsed")
+                tryCompare(bar, "isMorphing", false)
+                tryCompare(bar, "containerY", 0)
+            }
+
+            function test_late_geometry_during_open() {
+                const panel = childOfType(bar, "IslandMediaCenterPanel")
+                verify(panel !== null)
+                bar.expand("media")
+                tryCompare(bar, "isMorphing", true)
+                const original = panel.implicitHeight
+                panel.implicitHeight = original + 90
+                compare(bar.targetHeight, original + 90)
+                tryCompare(bar, "isMorphing", false)
+                tryCompare(bar, "targetCardHeight", bar.targetHeight)
+                panel.implicitHeight = original
+                tryCompare(bar, "targetCardHeight", original)
+                console.log("PILLS_LATE_GEOMETRY_PASSED")
+            }
+
+            function test_interrupted_retraction() {
+                Config.bar.pinned = false
+                NiriService.overviewOpen = true
+                tryCompare(bar, "shouldBeRevealed", false)
+                bar.expand("media")
+                tryCompare(bar, "containerY", 0)
+                verify(bar.openedFromHidden)
+                bar.collapse()
+                tryVerify(() => bar.retractingToHidden && bar.containerY < -1)
+                bar.expand("media")
+                tryCompare(bar, "containerY", 0)
+                compare(bar.currentMode, "media")
+                verify(!bar.retractingToHidden)
+                console.log("PILLS_INTERRUPTED_RETRACTION_PASSED")
+            }
+
+            function test_hidden_inline_osd() {
+                Config.bar.pinned = false
+                NiriService.overviewOpen = true
+                tryCompare(bar, "shouldBeRevealed", false)
+                for (const indicator of ["volume", "mic", "brightness"]) {
+                    bar.triggerOsd(indicator, 0.5, false)
+                    compare(bar.inlineOsdActive, true)
+                    compare(bar.shouldBeRevealed, true)
+                    tryCompare(bar, "containerY", 0)
+                    tryCompare(bar, "inlineOsdActive", false, 2500)
+                    compare(bar.shouldBeRevealed, false)
+                    tryVerify(() => bar.containerY < -bar.pillHeight)
+                }
+                console.log("PILLS_HIDDEN_OSD_PASSED")
+            }
+
+            function test_background_notification_dismissal() {
+                for (const mode of ["dashboard", "media", "apps", "projects"]) {
+                    bar.expand(mode)
+                    tryCompare(bar, "isMorphing", false)
+                    Notifications.popupList = [{id: 999, appName: "Review test", summary: "Background"}]
+                    compare(bar.currentMode, mode)
+                    Notifications.popupList = []
+                    compare(bar.currentMode, mode)
+                }
+                bar.collapse()
+                tryCompare(bar, "isMorphing", false)
+                Notifications.popupList = [{id: 1000, appName: "Review test", summary: "Foreground"}]
+                tryCompare(bar, "currentMode", "notification")
+                Notifications.popupList = []
+                tryCompare(bar, "currentMode", "collapsed")
+                console.log("PILLS_BACKGROUND_NOTIFICATION_PASSED")
+            }
+
+            function cleanupTestCase() { Qt.quit() }
+        }
+    }
+    Timer {
+        interval: 25000
+        running: true
+        onTriggered: { console.error("PILLS_RUNTIME_TIMEOUT"); Qt.quit() }
+    }
+}
+'''
+
+
+@unittest.skipUnless(shutil.which("qs"), "Quickshell is required for runtime checks")
+class PillsRuntimeTests(unittest.TestCase):
+    def test_transitions_and_feedback(self):
+        with tempfile.TemporaryDirectory(prefix="nonchalant-pills-") as directory:
+            fixture = Path(directory)
+            for name in ("modules", "config", "assets", "scripts", "version"):
+                (fixture / name).symlink_to(ROOT / name, target_is_directory=(ROOT / name).is_dir())
+            (fixture / "shell.qml").write_text(QML)
+            home = fixture / "home"
+            home.mkdir()
+            runtime = fixture / "runtime"
+            runtime.mkdir(mode=0o700)
+            env = {
+                **os.environ,
+                "HOME": str(home),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+                "XDG_STATE_HOME": str(home / ".local/state"),
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CACHE_HOME": str(home / ".cache"),
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "no-session-bus"),
+                "QT_QPA_PLATFORM": "offscreen",
+                "QT_QUICK_BACKEND": "software",
+                "NIRI_SOCKET": str(fixture / "no-compositor.sock"),
+            }
+            env.pop("WAYLAND_DISPLAY", None)
+            result = subprocess.run(
+                ["qs", "-p", str(fixture), "--no-duplicate", "--no-color"],
+                env=env, capture_output=True, text=True, timeout=30,
+            )
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, output)
+            for marker in ("LATE_GEOMETRY", "INTERRUPTED_RETRACTION", "HIDDEN_OSD", "BACKGROUND_NOTIFICATION"):
+                self.assertIn("PILLS_" + marker + "_PASSED", output, output)
+            self.assertNotIn("PILLS_RUNTIME_TIMEOUT", output, output)
+            self.assertNotIn("Binding loop", output, output)
+            self.assertNotIn("TypeError", output, output)
+            self.assertNotIn("Unable to assign [undefined]", output, output)
+
+
+if __name__ == "__main__":
+    unittest.main()

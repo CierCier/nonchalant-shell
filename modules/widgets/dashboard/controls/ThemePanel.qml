@@ -58,7 +58,7 @@ Item {
         JsonAdapter {
             property string currentWall: ""
             property string wallPath: ""
-            property string matugenScheme: "scheme-tonal-spot"
+            property string matugenScheme: "scheme-wallpaper"
             property string activeColorPreset: ""
         }
     }
