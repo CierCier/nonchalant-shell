@@ -48,6 +48,14 @@ Item {
 
     property bool isMorphing: false
 
+    onIsMorphingChanged: {
+        if (!root.isMorphing && root.isExpanded) {
+            root.targetCardWidth = root.targetWidth;
+            root.targetCardHeight = root.targetHeight;
+            root.targetCardX = Math.round((root.width - root.targetWidth) / 2);
+        }
+    }
+
     Timer {
         id: morphCollapseTimer
         interval: Motion.collapseDuration + 40
@@ -362,7 +370,7 @@ Item {
             return true;
         if (root.isExpanded || root.isMorphing)
             return true;
-        return barNormallyVisible;
+        return barNormallyVisible || inlineOsdActive;
     }
 
     readonly property bool isFullyRetracted: !shouldBeRevealed && root.revealProgress <= 0.01
@@ -672,7 +680,7 @@ Item {
 
     // Inline OSD State (Modesty non-disruptive inline status feedback)
     property bool inlineOsdActive: false
-    property string inlineOsdIcon: Icons.volume
+    property string inlineOsdIcon: Icons.speakerHigh
     property real inlineOsdValue: 0.0
     property string inlineOsdText: "0%"
 
@@ -710,7 +718,9 @@ Item {
         root.osdValue = value;
         root.osdMuted = muted;
         if (root.currentMode === "collapsed") {
-            root.inlineOsdIcon = muted ? Icons.volumeMute : (indicator === "brightness" ? Icons.sun : (indicator === "mic" ? Icons.mic : Icons.volume));
+            root.inlineOsdIcon = indicator === "brightness" ? Icons.sun
+                : (indicator === "mic" ? (muted ? Icons.micSlash : Icons.mic)
+                    : (muted ? Icons.speakerSlash : Icons.speakerHigh));
             root.inlineOsdValue = value;
             root.inlineOsdText = muted ? "Muted" : (Math.round(value * 100) + "%");
             root.inlineOsdActive = true;
@@ -857,7 +867,9 @@ Item {
                     id: contextPill
                     implicitHeight: root.pillHeight
                     implicitWidth: Math.min(
-                        fluidContextText.implicitWidth + (root.isMediaPlaying ? 42 : 24),
+                        fluidContextText.implicitWidth + contextContent.anchors.leftMargin
+                            + contextContent.anchors.rightMargin
+                            + (root.isMediaPlaying ? mediaVisualizer.implicitWidth + contextContent.spacing : 0),
                         root.isMediaPlaying ? 340 : 236
                     )
                     variant: "pane"
@@ -902,7 +914,7 @@ Item {
 
                     SurfaceLighting {
                         anchors.fill: parent
-                        radius: parent.radius
+                        radius: contextPill.radius
                         active: !root.isExpanded
                         interactive: true
                     }
@@ -917,6 +929,7 @@ Item {
                     }
 
                     RowLayout {
+                        id: contextContent
                         anchors.fill: parent
                         anchors.leftMargin: 12
                         anchors.rightMargin: 12
@@ -926,6 +939,7 @@ Item {
 
                         // 4 subtle animated media visualizer bars
                         Row {
+                            id: mediaVisualizer
                             spacing: 2
                             visible: root.isMediaPlaying
                             Layout.alignment: Qt.AlignVCenter
@@ -1043,7 +1057,7 @@ Item {
 
                     SurfaceLighting {
                         anchors.fill: parent
-                        radius: parent.radius
+                        radius: timePill.radius
                         active: !root.isExpanded
                         interactive: true
                     }
@@ -1120,7 +1134,7 @@ Item {
 
                     SurfaceLighting {
                         anchors.fill: parent
-                        radius: parent.radius
+                        radius: workspacesPill.radius
                         active: !root.isExpanded
                         interactive: true
                     }
@@ -1185,7 +1199,7 @@ Item {
 
                     SurfaceLighting {
                         anchors.fill: parent
-                        radius: parent.radius
+                        radius: statusPill.radius
                         active: !root.isExpanded
                         interactive: true
                     }
@@ -1219,11 +1233,11 @@ Item {
                             NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                         }
 
-                        Text {
+                        StyledText {
                             text: root.inlineOsdIcon
                             font.family: Icons.font
                             font.pixelSize: 13
-                            color: Colors.primary
+                            color: Colors[Colors.accentRole(root.osdIndicator)]
                             renderType: Text.NativeRendering
                         }
 
@@ -1238,7 +1252,7 @@ Item {
                                 width: parent.width * Math.max(0, Math.min(1, root.inlineOsdValue))
                                 height: 4
                                 radius: 2
-                                color: Colors.primary
+                                color: Colors[Colors.accentRole(root.osdIndicator)]
                                 Behavior on width {
                                     enabled: Motion.enabled
                                     SmoothedAnimation {
@@ -1250,7 +1264,7 @@ Item {
                             }
                         }
 
-                        Text {
+                        StyledText {
                             text: root.inlineOsdText
                             font.family: Config.theme.monoFont
                             font.pixelSize: Styling.fontSize(-2)
@@ -1309,7 +1323,7 @@ Item {
 
                     SurfaceLighting {
                         anchors.fill: parent
-                        radius: parent.radius
+                        radius: alertsPill.radius
                         active: !root.isExpanded
                         interactive: true
                     }
@@ -1328,7 +1342,7 @@ Item {
                         anchors.centerIn: parent
                         spacing: 4
 
-                        Text {
+                        StyledText {
                             text: Icons.bell
                             font.family: Icons.font
                             font.pixelSize: 13
@@ -1336,7 +1350,7 @@ Item {
                             renderType: Text.NativeRendering
                         }
 
-                        Text {
+                        StyledText {
                             text: String(root.alertsCount)
                             font.family: Config.theme.monoFont
                             font.pixelSize: Styling.fontSize(-2)

@@ -314,7 +314,7 @@ Item {
                 ? Math.max(0, Math.min(implicitHeight, root.maximumHeight - root.fixedContentHeight - mainCol.spacing))
                 : implicitHeight
             mode: "detail"
-            lyricsEnabled: Config.bar.lyricsEnabled
+                lyricsEnabled: Config.bar?.lyricsEnabled ?? true
             active: root.lyricsActive
         }
 

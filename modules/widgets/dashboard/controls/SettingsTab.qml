@@ -188,7 +188,12 @@ Item {
             }
         }
 
-        return matches.sort((left, right) => right.score - left.score).map((match, index) => ({
+        matches.sort((left, right) => {
+            const categoryOrder = settingsIndex.categories.findIndex(category => category.id === left.category)
+                - settingsIndex.categories.findIndex(category => category.id === right.category)
+            return categoryOrder || right.score - left.score
+        })
+        return matches.map((match, index) => ({
             pageId: match.pageId,
             section: match.section,
             category: match.category,

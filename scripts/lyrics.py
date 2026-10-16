@@ -151,7 +151,7 @@ def lookup(artist, title, album, seconds, video=False):
                    for candidate in found if rank(candidate) == best_rank}
         if len(artists) > 1:
             return None
-    if video and seconds > 0 and abs((entry.get("duration") or 0) - seconds) > 8:
+    if video and (seconds <= 0 or abs((entry.get("duration") or 0) - seconds) > 8):
         # Music videos can include extra scenes. Their recording's timestamps
         # cannot be applied to the video, but its words can still be displayed.
         entry = {**entry, "syncedLyrics": "", "plainLyrics": entry.get("plainLyrics")
@@ -197,7 +197,7 @@ def report(artist, title, album, seconds, source_url="", cider_track_id=None):
 
     signature = f"{artist}\n{title}\n{album}\n{round(seconds)}"
     if video:
-        signature = "youtube-v1\n" + signature
+        signature = "youtube-v2\n" + signature
     key = hashlib.sha1(signature.encode()).hexdigest()
     path = os.path.join(cache_dir(), f"{key}.json")
     try:

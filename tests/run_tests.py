@@ -178,6 +178,7 @@ def main():
         run_unittest_suite("Tier 1: Lyrics Lookup", "tests.unit.test_lyrics", collector, args.verbose)
         run_unittest_suite("Tier 1: Cider Lyrics", "tests.unit.test_cider_lyrics", collector, args.verbose)
         run_unittest_suite("Tier 1: Media Duration", "tests.unit.test_media_duration", collector, args.verbose)
+        run_unittest_suite("Tier 1: Wallpaper Palette", "tests.unit.test_wallpaper_palette", collector, args.verbose)
 
     if run_all or args.tier2:
         run_unittest_suite("Tier 2: Boundary & Corner Cases", "tests.unit.test_tier2_boundaries", collector, args.verbose)
@@ -191,6 +192,7 @@ def main():
         run_unittest_suite("Tier 4: MPRIS Duration Runtime", "tests.e2e.test_mpris_runtime", collector, args.verbose)
         run_unittest_suite("Tier 4: Cider Lyrics Runtime", "tests.e2e.test_cider_lyrics_runtime", collector, args.verbose)
         run_unittest_suite("Tier 4: Bar Context Text Runtime", "tests.e2e.test_bar_text_runtime", collector, args.verbose)
+        run_unittest_suite("Tier 4: Pills Runtime", "tests.e2e.test_pills_runtime", collector, args.verbose)
         run_unittest_suite("Tier 4: Tooltip Lifecycle Runtime", "tests.e2e.test_tooltip_runtime", collector, args.verbose)
 
     if args.json:
