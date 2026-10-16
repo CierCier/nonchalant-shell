@@ -11,24 +11,51 @@ import "calendar"
 Item {
     id: root
     property bool lyricsActive: false
-    implicitWidth: 544
-    implicitHeight: Config.bar?.style === "left"
-        ? quickControls.implicitHeight + scrollColumn.spacing + quickControls.implicitWidth
-        : 750
+    property string screenName: ""
+    readonly property bool verticalBar: Config.bar?.style === "left"
+    readonly property Item dashboardController: Visibilities.dashboardControllers[root.screenName] ?? null
+    readonly property string dashboardSection: root.dashboardController?.dashboardSection ?? "notifications"
+    implicitWidth: root.verticalBar ? widgetsRow.implicitWidth : 544
+    implicitHeight: root.verticalBar ? Math.max(verticalControls.implicitHeight, Styling.fontSize(0) * 26) : 750
+
+    function focusSearchInput(): void {
+        if (root.verticalBar)
+            sidePane.focusCurrentSection();
+        else
+            root.forceActiveFocus();
+    }
 
     RowLayout {
+        id: widgetsRow
         anchors.fill: parent
         spacing: 8
 
         FullPlayer {
-            visible: Config.bar?.style !== "left"
+            visible: !root.verticalBar
             Layout.preferredWidth: 216
             lyricsActive: root.lyricsActive
             Layout.fillHeight: true
         }
 
+        Calendar {
+            objectName: "dashboardCalendar"
+            visible: root.verticalBar
+            Layout.preferredWidth: Styling.fontSize(0) * 22
+            Layout.fillHeight: true
+        }
+
+        VerticalDashboardControls {
+            id: verticalControls
+            visible: root.verticalBar
+            Layout.preferredWidth: implicitWidth
+            Layout.fillHeight: true
+            dashboardSection: root.dashboardSection
+            onSectionRequested: section => root.dashboardController?.showDashboardSection(section)
+        }
+
         ClippingRectangle {
             id: widgetsContainer
+            visible: !root.verticalBar
             Layout.preferredWidth: quickControls.implicitWidth
             Layout.fillHeight: true
             radius: Styling.radius(4)
@@ -56,6 +83,8 @@ Item {
 
                     QuickControls {
                         id: quickControls
+                        dashboardSection: root.dashboardSection
+                        onSectionRequested: section => root.dashboardController?.toggleDashboardSection(section)
 
                         onExpandedPanelChanged: {
                             widgetsFlickable.contentY = 0;
@@ -63,12 +92,13 @@ Item {
                     }
 
                     Calendar {
+                        visible: !root.verticalBar
                         Layout.fillWidth: true
                         Layout.preferredHeight: width
                     }
 
                     StyledRect {
-                        visible: Config.bar?.style !== "left"
+                        visible: !root.verticalBar
                         variant: "pane"
                         Layout.fillWidth: true
                         Layout.preferredHeight: settingsInner.implicitHeight + 8
@@ -126,8 +156,18 @@ Item {
         }
 
         NotificationHistory {
+            visible: !root.verticalBar
             Layout.fillWidth: true
             Layout.fillHeight: true
+        }
+
+        DashboardSidePane {
+            id: sidePane
+            visible: root.verticalBar
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            section: root.verticalBar ? root.dashboardSection : ""
+            screenName: root.screenName
         }
     }
 }

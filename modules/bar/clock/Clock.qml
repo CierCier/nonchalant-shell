@@ -22,6 +22,7 @@ Item {
     // Vertical rail uses two digit rows with the date in its tooltip.
     property bool vertical: false
     property int verticalWidth: Math.max(36, Config.theme.fontSize + 20)
+    property Item mediaAnchor: null
 
     property bool layerEnabled: false
     
@@ -45,7 +46,8 @@ Item {
     }
 
     property string controlMode: ""
-    readonly property bool systemMonitorActive: root.vertical && dashboardPopup.isOpen && root.controlMode === "stats"
+    property string dashboardSection: "notifications"
+    readonly property bool systemMonitorActive: root.vertical && dashboardPopup.isOpen && !root.controlMode && root.dashboardSection === "stats"
 
     onSystemMonitorActiveChanged: {
         const screenName = root.bar?.screen?.name ?? "";
@@ -58,6 +60,10 @@ Item {
     function openControlMenu(mode: string): void {
         if (!root.vertical)
             return;
+        if (mode === "stats") {
+            root.toggleDashboardSection("stats");
+            return;
+        }
         if (dashboardPopup.isOpen && root.controlMode === mode) {
             dashboardPopup.close();
             return;
@@ -66,20 +72,38 @@ Item {
         dashboardPopup.open();
     }
 
+    function showDashboardSection(section: string): void {
+        root.controlMode = "";
+        root.dashboardSection = section;
+        GlobalStates.dashboardCurrentTab = 0;
+        dashboardPopup.open();
+        Qt.callLater(() => dashboardLoader.item?.focusCurrentTab());
+    }
+
+    function toggleDashboardSection(section: string): void {
+        root.showDashboardSection(dashboardPopup.isOpen && !root.controlMode && root.dashboardSection === section
+            ? "notifications" : section);
+    }
+
     function toggleCenterMenu() {
-        if (dashboardPopup.isOpen && (!root.vertical || root.controlMode === "")) {
+        if (dashboardPopup.isOpen && (!root.vertical || (!root.controlMode && root.dashboardSection === "notifications"))) {
             dashboardPopup.close();
             return;
         }
 
         root.controlMode = "";
+        root.dashboardSection = "notifications";
         GlobalStates.dashboardCurrentTab = 0;
         // claimBarPopup closes any sibling popup (e.g. weather) in the same turn.
         dashboardPopup.open();
     }
 
     function toggleWallpapers() {
-        if (dashboardPopup.isOpen && GlobalStates.dashboardCurrentTab === 1 && (!root.vertical || root.controlMode === "")) {
+        if (root.vertical) {
+            root.toggleDashboardSection("wallpapers");
+            return;
+        }
+        if (dashboardPopup.isOpen && GlobalStates.dashboardCurrentTab === 1) {
             dashboardPopup.close();
             return;
         }
@@ -626,6 +650,10 @@ Item {
         readonly property int edgeGap: 8
         readonly property real barClearance: root.bar.totalBarHeight + edgeGap
         readonly property Item hitbox: dashboardSurface.fullyHidden ? null : dashboardSurface.body
+        readonly property real mediaAnchorY: root.mediaAnchor?.parent
+            ? root.mediaAnchor.parent.mapToItem(dashboardPopup,
+                root.mediaAnchor.x, root.mediaAnchor.y + root.mediaAnchor.height / 2).y
+            : dashboardPopup.height
 
         z: 1000
         // Right of the dock on a left bar, otherwise below/above it.
@@ -674,13 +702,23 @@ Item {
             variant: root.vertical && !root.controlMode ? "transparent" : "popup"
             padding: root.vertical && !root.controlMode ? 0 : 8
             shown: dashboardPopup.isOpen
-            contentWidth: dashboardLoader.item ? dashboardLoader.item.implicitWidth + padding * 2 : 916
-            contentHeight: dashboardLoader.item ? dashboardLoader.item.implicitHeight + padding * 2 : 360
+            contentWidth: Math.min(dashboardPopup.leftBar ? Math.max(0, dashboardPopup.width - dashboardPopup.edgeGap) : Infinity,
+                dashboardLoader.item ? dashboardLoader.item.implicitWidth + padding * 2 : 916)
+            contentHeight: Math.min(dashboardPopup.leftBar ? Math.max(0, dashboardPopup.height - dashboardPopup.edgeGap * 2) : Infinity,
+                dashboardLoader.item ? dashboardLoader.item.implicitHeight + padding * 2 : 360)
             originWidth: buttonBg.width
             fromBottom: dashboardPopup.bottomBar
             fromLeft: dashboardPopup.leftBar
             x: dashboardPopup.leftBar ? 0 : Math.round((dashboardPopup.width - width) / 2)
-            y: dashboardPopup.leftBar ? Math.max(8, dashboardPopup.height - height - 8) : (dashboardPopup.bottomBar ? dashboardPopup.height - height : 0)
+            y: {
+                if (!dashboardPopup.leftBar)
+                    return dashboardPopup.bottomBar ? dashboardPopup.height - height : 0;
+                const desiredY = root.controlMode === "media" && (root.mediaAnchor?.visible ?? false)
+                    ? dashboardPopup.mediaAnchorY - height / 2
+                    : dashboardPopup.height - height - dashboardPopup.edgeGap;
+                return Math.max(dashboardPopup.edgeGap,
+                    Math.min(dashboardPopup.height - height - dashboardPopup.edgeGap, desiredY));
+            }
 
             Loader {
                 id: dashboardLoader
@@ -700,6 +738,9 @@ Item {
                     id: verticalControlMenu
                     VerticalControlMenu {
                         mode: root.controlMode
+                        lyricsActive: dashboardPopup.isOpen && root.controlMode === "media"
+                        maximumSize: Math.max(0, Math.min(dashboardPopup.width - dashboardPopup.edgeGap,
+                            dashboardPopup.height - dashboardPopup.edgeGap * 2) - dashboardSurface.padding * 2)
                         onBackRequested: root.toggleCenterMenu()
                         onCloseRequested: dashboardPopup.close()
                     }

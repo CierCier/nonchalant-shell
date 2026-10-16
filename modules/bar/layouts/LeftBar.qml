@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import qs.config
 import qs.modules.bar.clock
+import qs.modules.bar.workspaces
 import qs.modules.bar.systray
 import qs.modules.components
 import qs.modules.services
@@ -36,6 +37,19 @@ Item {
 
     // Tray drawer; the chevron above the tray toggles it.
     property bool trayExpanded: false
+
+    readonly property list<CompositorWorkspace> visibleWorkspaces: CompositorService.workspacesForOutput(root.screen.name)
+    // Keep delegates alive when only workspace/window state changes.
+    readonly property string workspaceOrder: JSON.stringify(visibleWorkspaces.map(workspace => workspace.id))
+    property list<string> workspaceIds: []
+    onWorkspaceOrderChanged: workspaceIds = visibleWorkspaces.map(workspace => workspace.id)
+
+    readonly property int activeWorkspaceIndex: visibleWorkspaces.findIndex(workspace => workspace.active)
+    readonly property Item activeWorkspaceButton: {
+        const count = workspaceRepeater.count;
+        return activeWorkspaceIndex >= 0 && activeWorkspaceIndex < count
+            ? workspaceRepeater.itemAt(activeWorkspaceIndex) : null;
+    }
 
     readonly property string networkIcon: {
         if (NetworkService.ethernet)
@@ -70,8 +84,10 @@ Item {
         required property string tooltipText
         property string description: ""
         property bool selected: false
+        property bool externalHighlight: false
         property bool muted: false
         property bool textLabel: false
+        property bool showLabel: true
         property bool occupied: false
         property bool urgent: false
 
@@ -94,18 +110,20 @@ Item {
             id: buttonSurface
             anchors.fill: parent
             variant: button.selected ? "focus" : "common"
-            backgroundOpacity: button.selected ? 1 : 0
+            backgroundOpacity: button.selected && !button.externalHighlight ? 1 : 0
+            enableBorder: !button.externalHighlight
             radius: root.outerRadius
             enableShadow: false
 
             HoverTint {
-                hovered: buttonMouse.containsMouse
+                hovered: buttonMouse.containsMouse && !(button.externalHighlight && button.selected)
                 pressed: buttonMouse.pressed
             }
         }
 
         StyledText {
             anchors.centerIn: parent
+            visible: button.showLabel
             text: button.iconText
             font.family: button.textLabel ? Config.theme.font : Icons.font
             font.pixelSize: button.textLabel ? Config.theme.fontSize : Styling.fontSize(4)
@@ -233,24 +251,63 @@ Item {
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
 
+                        // Keep the target stable when compositor updates recreate delegates.
+                        Item {
+                            id: workspaceHighlightTarget
+                            visible: false
+                            x: (workspaceColumn.width - root.controlSize) / 2
+                            y: Math.max(0, root.activeWorkspaceIndex) * (root.controlSize + workspaceColumn.spacing)
+                            width: root.controlSize
+                            height: Math.max(root.controlSize, root.activeWorkspaceButton?.implicitHeight ?? 0)
+                        }
+
+                        ElasticHighlight {
+                            objectName: "verticalWorkspaceHighlight"
+                            targetItem: workspaceHighlightTarget
+                            variant: "focus"
+                            radius: root.outerRadius
+                            opacity: root.activeWorkspaceIndex >= 0 ? 1 : 0
+                            scale: root.activeWorkspaceButton?.scale ?? 1
+                        }
+
                         ColumnLayout {
                             id: workspaceColumn
+                            z: 1
                             width: parent.width
                             spacing: 4
 
                             Repeater {
-                                model: CompositorService.workspacesForOutput(root.screen.name)
+                                id: workspaceRepeater
+                                model: root.workspaceIds
 
                                 DockIconButton {
-                                    required property CompositorWorkspace modelData
-                                    iconText: String(modelData.idx)
+                                    id: workspaceButton
+                                    required property string modelData
+                                    readonly property CompositorWorkspace workspace: CompositorService.workspaceById(modelData)
+                                    readonly property list<CompositorWindow> windows: CompositorService.windowsForWorkspace(modelData)
+                                    readonly property bool showWindows: selected && windows.length > 0
+                                    implicitHeight: showWindows ? Math.max(root.controlSize, windowList.implicitHeight + root.contentPadding) : root.controlSize
+                                    showLabel: !showWindows
+                                    objectName: "verticalWorkspaceButton-" + modelData
+                                    externalHighlight: true
+                                    iconText: String(workspace?.idx ?? "")
                                     textLabel: true
-                                    selected: modelData.active
-                                    occupied: modelData.windows > 0
-                                    urgent: modelData.is_urgent
-                                    tooltipText: modelData.isNamed ? modelData.name : "Workspace " + modelData.idx
-                                    description: modelData.windows + (modelData.windows === 1 ? " window" : " windows")
-                                    onClicked: CompositorService.focusWorkspace(modelData.id)
+                                    selected: workspace?.active ?? false
+                                    occupied: (workspace?.windows ?? 0) > 0
+                                    urgent: workspace?.is_urgent ?? false
+                                    tooltipText: workspace?.isNamed ? workspace.name : "Workspace " + (workspace?.idx ?? "")
+                                    description: (workspace?.windows ?? 0) + ((workspace?.windows ?? 0) === 1 ? " window" : " windows")
+                                    WorkspaceWindowList {
+                                        id: windowList
+                                        objectName: "verticalWorkspaceWindows-" + workspaceButton.modelData
+                                        z: 1
+                                        anchors.centerIn: parent
+                                        vertical: true
+                                        windows: workspaceButton.showWindows ? workspaceButton.windows : []
+                                        visible: workspaceButton.showWindows
+                                    }
+
+                                    onClicked: CompositorService.focusWorkspace(modelData)
                                     onScrolled: delta => {
                                         if (delta !== 0)
                                             CompositorService.focusAdjacentWorkspace(root.screen.name, delta < 0 ? 1 : -1);
@@ -260,21 +317,12 @@ Item {
                         }
                     }
 
-                    DockIconButton {
-                        id: mediaButton
-                        visible: MprisController.activePlayer !== null
-                        iconText: Icons.disc
-                        selected: MprisController.isPlaying
-                        tooltipText: MprisController.trackTitle || "Media"
-                        description: "Click for player · Right-click to play/pause · Scroll to skip"
-                        onClicked: clock.openControlMenu("media")
-                        onSecondaryClicked: MprisController.togglePlaying()
-                        onScrolled: delta => {
-                            if (delta > 0)
-                                MprisController.previous();
-                            else if (delta < 0)
-                                MprisController.next();
-                        }
+                    VerticalMediaWidget {
+                        id: mediaPill
+                        Layout.alignment: Qt.AlignHCenter
+                        buttonSize: root.controlSize
+                        maximumHeight: Math.min(root.controlSize * 5, root.height / 4)
+                        onActivated: clock.openControlMenu("media")
                     }
 
                     DockIconButton {
@@ -374,6 +422,7 @@ Item {
                         Layout.alignment: Qt.AlignHCenter
                         vertical: true
                         verticalWidth: root.controlSize
+                        mediaAnchor: mediaPill
                         bar: root
                         layerEnabled: root.shadowsEnabled
                         startRadius: root.outerRadius

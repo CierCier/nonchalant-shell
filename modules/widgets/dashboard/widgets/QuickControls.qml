@@ -16,6 +16,8 @@ StyledRect {
     radius: Styling.radius(4)
 
     readonly property bool verticalBar: Config.bar?.style === "left"
+    property string dashboardSection: "notifications"
+    signal sectionRequested(string section)
 
     property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth, 2: GPU
 
@@ -42,10 +44,13 @@ StyledRect {
             implicitHeight: buttonRow.implicitHeight + 8
             radius: Styling.radius(0)
 
-            RowLayout {
+            GridLayout {
                 id: buttonRow
                 anchors.centerIn: parent
-                spacing: 4
+                columns: root.verticalBar ? 1 : -1
+                rows: root.verticalBar ? -1 : 1
+                rowSpacing: 4
+                columnSpacing: 4
 
                 ControlButton {
                     visible: root.verticalBar
@@ -62,9 +67,10 @@ StyledRect {
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
                     iconName: Icons.circuitry
-                    isActive: GlobalStates.systemMonitorOpen
+                    objectName: "dashboardStatsButton"
+                    isActive: root.dashboardSection === "stats"
                     tooltipText: "System Monitor"
-                    onClicked: GlobalShortcuts.run("system-monitor")
+                    onClicked: root.sectionRequested("stats")
                 }
 
                 ControlButton {
@@ -139,9 +145,15 @@ StyledRect {
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
                     iconName: Icons.wallpapers
-                    isActive: GlobalStates.dashboardCurrentTab === 1
+                    objectName: "dashboardWallpapersButton"
+                    isActive: root.verticalBar ? root.dashboardSection === "wallpapers" : GlobalStates.dashboardCurrentTab === 1
                     tooltipText: "Wallpapers"
-                    onClicked: GlobalStates.dashboardCurrentTab = 1
+                    onClicked: {
+                        if (root.verticalBar)
+                            root.sectionRequested("wallpapers");
+                        else
+                            GlobalStates.dashboardCurrentTab = 1;
+                    }
                 }
 
                 ControlButton {

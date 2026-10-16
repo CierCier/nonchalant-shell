@@ -5,11 +5,35 @@ import qs.modules.services
 import qs.modules.globals
 
 Item {
+    id: root
+
+    function dashboardItems(item: Item): list<var> {
+        if (!item)
+            return [];
+        let items = [];
+        if (item.objectName.startsWith("dashboard") || item.objectName.startsWith("verticalWorkspace") || item.objectName.startsWith("workspaceWindows")) {
+            const position = item.mapToItem(null, 0, 0);
+            items.push({
+                name: item.objectName,
+                geometry: [position.x, position.y, item.width, item.height],
+                visible: item.visible,
+                enabled: item.enabled,
+                opacity: item.opacity,
+                activeFocus: item.activeFocus,
+                monthShift: item.objectName === "dashboardCalendar" ? item.monthShift : null
+            });
+        }
+        for (const child of item.children)
+            items = items.concat(root.dashboardItems(child));
+        return items;
+    }
+
     IpcHandler {
         target: "shell-test"
         function state(): string {
             const island = Visibilities.getIslandForActive();
             const outputName = Quickshell.screens[0]?.name ?? "";
+            const controller = Visibilities.getDashboardControllerForActive();
             return JSON.stringify({
                 activeModule: Visibilities.currentActiveModule,
                 activeScreen: Visibilities.getForActive()?.screenName ?? "",
@@ -22,6 +46,11 @@ Item {
                 popupOpen: Visibilities.activeBarPopup?.isOpen ?? false,
                 systemMonitorOpen: GlobalStates.systemMonitorOpen,
                 controlMenu: Visibilities.activeBarPopup?.menuMode ?? "",
+                dashboardSection: controller?.dashboardSection ?? "",
+                dashboardTab: GlobalStates.dashboardCurrentTab,
+                dashboardItems: root.dashboardItems(controller?.dashboardHitbox ?? null),
+                workspaceItems: root.dashboardItems(island ?? controller?.bar ?? null)
+                    .filter(item => item.name.startsWith("verticalWorkspace") || item.name.startsWith("workspaceWindows")),
                 powerOpen: Visibilities.powerMenuButtons[outputName]?.popupOpen ?? false,
                 hasActiveGrab: FocusGrabManager.hasActiveGrab,
                 settingsVisible: GlobalStates.settingsWindowVisible,

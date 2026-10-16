@@ -7,7 +7,7 @@ import qs.modules.services
 Item {
     id: root
 
-    implicitWidth: 900
+    implicitWidth: Config.bar?.style === "left" ? dashboardItem.implicitWidth : 900
     implicitHeight: Config.bar?.style === "left" ? dashboardItem.implicitHeight : 56 + 48 * 6
     property string screenName: ""
     property bool popupMode: false
