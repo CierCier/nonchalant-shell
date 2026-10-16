@@ -137,7 +137,8 @@ run)
 	if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
 		PIPE="$XDG_RUNTIME_DIR/nonchalant_ipc.pipe"
 	else
-		PIPE="/tmp/nonchalant_ipc_${WAYLAND_DISPLAY:-default}.pipe"
+		SESSION_DISPLAY="${WAYLAND_DISPLAY:-default}"
+		PIPE="${XDG_CACHE_HOME:-$HOME/.cache}/nonchalant/ipc/${SESSION_DISPLAY##*/}.pipe"
 	fi
 
 
@@ -146,9 +147,11 @@ run)
 		exit 1
 	fi
 
-	# Fast path: Write directly to pipe if it exists (Zero latency)
 	if [ -p "$PIPE" ]; then
-		echo "$CMD" >"$PIPE" &
+		if ! timeout 1s bash -c 'printf "%s\n" "$1" >"$2"' nonchalant-ipc-write "$CMD" "$PIPE"; then
+			echo "Error: Nonchalant IPC pipe is not accepting commands" >&2
+			exit 1
+		fi
 		exit 0
 	fi
 

@@ -12,14 +12,19 @@ Singleton {
     id: root
 
     readonly property string appId: "nonchalant"
-    // XDG_RUNTIME_DIR is already session-private. Only the /tmp fallback
-    // needs a session key so concurrent sessions do not share one FIFO.
-    readonly property string ipcPipe: Quickshell.env("XDG_RUNTIME_DIR") ? Quickshell.env("XDG_RUNTIME_DIR") + "/nonchalant_ipc.pipe" : "/tmp/nonchalant_ipc_" + (Quickshell.env("WAYLAND_DISPLAY") || "default") + ".pipe"
+    readonly property string ipcPipe: {
+        const runtime = Quickshell.env("XDG_RUNTIME_DIR");
+        if (runtime)
+            return runtime + "/nonchalant_ipc.pipe";
+        const cache = Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache";
+        const display = (Quickshell.env("WAYLAND_DISPLAY") || "default").split("/").pop();
+        return cache + "/nonchalant/ipc/" + display + ".pipe";
+    }
 
     // High-performance Pipe Listener (Daemon mode)
     Process {
         id: pipeListener
-        command: ["bash", "-c", "rm -f \"$1\"; mkfifo \"$1\"; tail -f \"$1\"", "nonchalant-ipc-listener", root.ipcPipe]
+        command: ["bash", "-c", "umask 077; mkdir -p -- \"$(dirname -- \"$1\")\" && rm -f -- \"$1\" && mkfifo -m 600 -- \"$1\" && exec tail -f -- \"$1\"", "nonchalant-ipc-listener", root.ipcPipe]
         running: true
         
         stdout: SplitParser {

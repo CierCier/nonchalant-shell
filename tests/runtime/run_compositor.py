@@ -314,11 +314,13 @@ def main():
         try:
             result = subprocess.run(command, env=env)
         finally:
-            (root / "runtime").unlink()
-            shutil.copytree(runtime, root / "runtime", ignore=lambda directory, names: [
-                name for name in names if (Path(directory) / name).is_socket()
-                or (Path(directory) / name).is_fifo()])
-            shutil.rmtree(runtime, ignore_errors=True)
+            try:
+                (root / "runtime").unlink()
+                shutil.copytree(runtime, root / "runtime", ignore=lambda directory, names: [
+                    name for name in names if (Path(directory) / name).is_socket()
+                    or (Path(directory) / name).is_fifo()])
+            finally:
+                shutil.rmtree(runtime, ignore_errors=True)
         print(f"Artifacts: {root}")
         return result.returncode
     session = Session(args.inside_session, args.quickshell)
@@ -343,6 +345,9 @@ def main():
         result["error"] = str(error)
         print(json.dumps(result, indent=2), file=sys.stderr)
         exit_code = 1
+    except BaseException as error:
+        result["error"] = f"{type(error).__name__}: {error}".rstrip(": ")
+        raise
     finally:
         if hasattr(session, "power_script"):
             try:
@@ -394,15 +399,14 @@ def main():
                     ("Binding loop", "TypeError:", "ReferenceError:")) for line in lines),
                 "missingTools": sum("Process failed to start" in line for line in lines)
             }
-        (session.root / "result.json").write_text(json.dumps(result, indent=2))
         broken = sum(counts["qmlErrors"] + counts["bindingOrTypeWarnings"]
                      for counts in result["runtimeDiagnosticCounts"].values())
         if broken:
             result["error"] = result.get("error") or (
                 f"{broken} QML errors or binding failures in runtime logs")
-            (session.root / "result.json").write_text(json.dumps(result, indent=2))
-            return 1
-        return exit_code
+            exit_code = 1
+        (session.root / "result.json").write_text(json.dumps(result, indent=2))
+    return exit_code
 
 
 if __name__ == "__main__":

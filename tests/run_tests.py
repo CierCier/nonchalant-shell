@@ -192,6 +192,8 @@ def main():
     if run_all or args.codecs:
         run_compositor_tests(collector, args.verbose)
         run_unittest_suite("Standalone compositor power", "tests.unit.test_compositor_power", collector, args.verbose)
+        run_unittest_suite("Compositor runner failures", "tests.unit.test_runtime_runner", collector, args.verbose)
+        run_unittest_suite("CLI FIFO delivery", "tests.unit.test_cli_ipc", collector, args.verbose)
 
     if run_all or args.tier1:
         run_unittest_suite("Tier 1: Feature Coverage", "tests.unit.test_tier1_features", collector, args.verbose)
