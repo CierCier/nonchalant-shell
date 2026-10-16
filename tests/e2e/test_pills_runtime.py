@@ -119,6 +119,72 @@ ShellRoot {
                 console.log("PILLS_BACKGROUND_NOTIFICATION_PASSED")
             }
 
+            function test_stats_badges_share_configured_accent() {
+                const panel = childOfType(bar, "IslandStatsPanel")
+                verify(panel !== null)
+                SystemResources.monitorProcess.running = false
+                SystemResources.gpuNames = ["Test NVIDIA", "Test AMD"]
+                SystemResources.gpuUsages = [0, 2]
+                SystemResources.gpuTemps = [47, 45]
+                SystemResources.gpuVramUsed = [0, 0]
+                SystemResources.gpuVramTotal = [0, 0]
+                SystemResources.gpuCount = 2
+                SystemResources.gpuDetected = true
+                SystemResources.validDisks = ["/"]
+                SystemResources.diskUsage = {"/": 59}
+
+                function descendants(item, predicate) {
+                    let result = predicate(item) ? [item] : []
+                    for (const child of item.children ?? [])
+                        result = result.concat(descendants(child, predicate))
+                    return result
+                }
+
+                function styledParent(item) {
+                    let parent = item.parent
+                    while (parent && parent.variant === undefined)
+                        parent = parent.parent
+                    return parent
+                }
+
+                const originalGradient = Config.theme.srPrimary.gradient
+                const originalForeground = Config.theme.srPrimary.itemColor
+                try {
+                    for (const role of ["primary", "magenta"]) {
+                        Config.theme.srPrimary.gradient = [[role, 0]]
+                        Config.theme.srPrimary.itemColor = role === "primary" ? "overPrimary" : "overMagenta"
+                        for (const usage of [4, 70, 95, 4]) {
+                            SystemResources.cpuUsage = usage
+                            SystemResources.ramUsage = usage
+                            SystemResources.diskUsage = {"/": usage}
+                            SystemResources.gpuUsages = [usage, 2]
+                            const glyphs = [Icons.cpu, Icons.ram, Icons.gpu, Icons.disk,
+                                Icons.vpnKey, Icons.wifiHigh, Icons.ethernet]
+                            const badges = descendants(panel, item => glyphs.includes(item.text))
+                            compare(badges.length, 6, "CPU, RAM, both GPUs, disk and network")
+                            for (const icon of badges) {
+                                const badge = styledParent(icon)
+                                verify(badge !== null)
+                                compare(badge.variant, "primary")
+                                tryCompare(badge, "singleGradientColor", Colors[role])
+                                tryCompare(icon, "color", Styling.srItem("primary"))
+                            }
+                            const fills = descendants(panel, item =>
+                                item.variant !== undefined && styledParent(item)?.height === 4)
+                            compare(fills.length, 5, "CPU, RAM, both GPUs and disk progress fills")
+                            for (const fill of fills) {
+                                compare(fill.variant, "primary")
+                                tryCompare(fill, "singleGradientColor", Colors[role])
+                            }
+                        }
+                    }
+                } finally {
+                    Config.theme.srPrimary.gradient = originalGradient
+                    Config.theme.srPrimary.itemColor = originalForeground
+                }
+                console.log("PILLS_STATS_ACCENT_PASSED")
+            }
+
             function cleanupTestCase() {
                 CompositorService.backend.state = null
                 Qt.quit()
@@ -181,7 +247,7 @@ class PillsRuntimeTests(unittest.TestCase):
             )
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, output)
-            for marker in ("LATE_GEOMETRY", "INTERRUPTED_RETRACTION", "HIDDEN_OSD", "BACKGROUND_NOTIFICATION"):
+            for marker in ("LATE_GEOMETRY", "INTERRUPTED_RETRACTION", "HIDDEN_OSD", "BACKGROUND_NOTIFICATION", "STATS_ACCENT"):
                 self.assertIn("PILLS_" + marker + "_PASSED", output, output)
             self.assertNotIn("PILLS_RUNTIME_TIMEOUT", output, output)
             self.assertNotIn("Binding loop", output, output)

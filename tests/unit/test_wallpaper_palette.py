@@ -169,7 +169,7 @@ console.log(JSON.stringify({adapter: config.adapter, generations}));
                     self.assertGreaterEqual(contrast(rgb(palette[role]), rgb(palette[foreground])), 4.5)
 
     @unittest.skipUnless(shutil.which("node"), "node unavailable")
-    def test_resource_roles_follow_warning_thresholds_in_both_panels(self):
+    def test_classic_resource_roles_follow_warning_thresholds(self):
         source = (ROOT / "modules/theme/Colors.qml").read_text()
         match = re.search(r"function metricRole\(metric: string, usage: real\): string \{(.*?)\n    \}", source, re.S)
         self.assertIsNotNone(match)
@@ -185,11 +185,9 @@ console.log(JSON.stringify({adapter: config.adapter, generations}));
         self.assertEqual(json.loads(result.stdout),
                          ["primary", "primary", "yellow", "red", "primary", "yellow", "red",
                           "blue", "yellow", "green"])
-        for path in ("modules/bar/island/IslandStatsPanel.qml",
-                     "modules/widgets/dashboard/metrics/MetricsTab.qml"):
-            panel = (ROOT / path).read_text()
-            for metric in ("cpu", "disk", "memory", "gpu", "network"):
-                self.assertIn('Colors.metricRole("' + metric + '"', panel)
+        panel = (ROOT / "modules/widgets/dashboard/metrics/MetricsTab.qml").read_text()
+        for metric in ("cpu", "disk", "memory", "gpu", "network"):
+            self.assertIn('Colors.metricRole("' + metric + '"', panel)
 
     def test_image_and_gif_use_same_first_frame(self):
         self.stripes(["#cd7840", "#36a89c", "#82b44b"])

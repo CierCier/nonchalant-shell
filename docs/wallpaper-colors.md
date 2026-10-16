@@ -34,7 +34,7 @@ shared cache when the caller requests another output path.
 
 ## Metric roles
 
-Both resource panels use `Colors.metricRole()` for data colors:
+The classic resource panel uses `Colors.metricRole()` for data colors:
 
 | Metric | Palette role |
 | --- | --- |
@@ -44,8 +44,13 @@ Both resource panels use `Colors.metricRole()` for data colors:
 | GPU | Yellow, independent of vendor branding. |
 | Network | Green. |
 
-Icon foregrounds follow their background variants. Inline OSD progress uses
-the primary selection role through `Colors.accentRole()`. These roles still
+Island and Pills use the shared `IslandStatsPanel`: every resource badge and
+progress fill uses the configured `primary` StyledRect variant. Icon foregrounds
+use `Styling.srItem("primary")` so custom theme edits remain readable. Metric
+palette names such as `blue` are colors, not StyledRect variants.
+
+Inline OSD progress uses the primary selection role through `Colors.accentRole()`.
+These roles still
 resolve through the selected palette. Other widgets retain their existing
 color assignments.
 
@@ -60,10 +65,12 @@ color assignments.
 | Dark/light switches | Applies. Both use the shared generator; palette contrast is tested in both modes. |
 | Images, GIFs, video | Applies. Images and GIF first frames reach Pillow. Video uses the existing thumbnail path. GIF equivalence is tested; live video selection is not tested. |
 | Generation failure | Applies. Invalid-image, stale-output, output-isolation, Matugen, and Wallust fallback tests check publication behavior. |
-| Island and classic resource panels | Applies. Both use the shared metric roles. Threshold decisions and caller coverage are tested. Warning transitions are not visually tested on the desktop. |
+| Island and Pills resource panels | Applies. Their shared panel uses matching primary badges and progress fills. The isolated runtime test covers CPU, RAM, two GPU delegates, disk, network, low/high/low usage, and custom primary background/foreground edits. The live desktop is not driven by tests. |
+| Classic resource panel | Applies. Metric colors resolve directly through Colors. Threshold decisions and caller coverage are tested. |
+| Niri and Hyprland | The resource panel has no compositor-specific styling. Tests use an isolated offscreen display and private D-Bus/config/cache paths. |
 | Shell widgets and application exports | Applies. Output matches the existing palette contract. Individual themed applications are not visually tested. |
 | Static presets and OLED | Applies. Existing preset selection and OLED overrides remain. |
-| Remote providers and mobile clients | Does not apply. Extraction is a local process for this Wayland shell. |
+| Remote providers, relay, mobile clients and new config keys | Does not apply. Extraction and panel styling are local to this Wayland shell and use existing theme settings. |
 
 Run the focused checks with:
 

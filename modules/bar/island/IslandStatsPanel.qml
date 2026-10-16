@@ -14,11 +14,6 @@ Item {
     implicitWidth: 420
     implicitHeight: mainColumn.implicitHeight + 28
 
-    readonly property string cpuRole: Colors.metricRole("cpu", SystemResources.cpuUsage)
-    readonly property string memoryRole: Colors.metricRole("memory", SystemResources.ramUsage)
-    readonly property string gpuRole: Colors.metricRole("gpu", 0)
-    readonly property string networkRole: Colors.metricRole("network", 0)
-
     signal backRequested()
 
     Component.onDestruction: {
@@ -131,7 +126,7 @@ Item {
                                 implicitWidth: 26
                                 implicitHeight: 26
                                 radius: 13
-                                variant: root.cpuRole
+                                variant: "primary"
 
                                 Text {
                                     anchors.centerIn: parent
@@ -140,7 +135,7 @@ Item {
                                     text: Icons.cpu
                                     font.family: Icons.font
                                     font.pixelSize: 13
-                                    color: Styling.srItem(root.cpuRole)
+                                    color: Styling.srItem("primary")
                                 }
                             }
 
@@ -198,7 +193,7 @@ Item {
                                 height: parent.height
                                 width: (SystemResources.cpuUsage > 0) ? Math.max(2, cpuTrack.width * Math.min(1.0, SystemResources.cpuUsage / 100)) : 0
                                 radius: 2
-                                variant: root.cpuRole
+                                variant: "primary"
 
                                 Behavior on width {
                                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -228,7 +223,7 @@ Item {
                                 implicitWidth: 26
                                 implicitHeight: 26
                                 radius: 13
-                                variant: root.memoryRole
+                                variant: "primary"
 
                                 Text {
                                     anchors.centerIn: parent
@@ -237,7 +232,7 @@ Item {
                                     text: Icons.ram
                                     font.family: Icons.font
                                     font.pixelSize: 13
-                                    color: Styling.srItem(root.memoryRole)
+                                    color: Styling.srItem("primary")
                                 }
                             }
 
@@ -290,7 +285,7 @@ Item {
                                 height: parent.height
                                 width: (SystemResources.ramUsage > 0) ? Math.max(2, ramTrack.width * Math.min(1.0, SystemResources.ramUsage / 100)) : 0
                                 radius: 2
-                                variant: root.memoryRole
+                                variant: "primary"
 
                                 Behavior on width {
                                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -327,7 +322,7 @@ Item {
                                     implicitWidth: 26
                                     implicitHeight: 26
                                     radius: 13
-                                    variant: root.gpuRole
+                                    variant: "primary"
 
                                     Text {
                                         anchors.centerIn: parent
@@ -336,7 +331,7 @@ Item {
                                         text: Icons.gpu
                                         font.family: Icons.font
                                         font.pixelSize: 13
-                                        color: Styling.srItem(root.gpuRole)
+                                        color: Styling.srItem("primary")
                                     }
                                 }
 
@@ -395,7 +390,7 @@ Item {
                                     height: parent.height
                                     width: (gpuDelegate.gpuUsageVal > 0) ? Math.max(2, gpuTrack.width * Math.min(1.0, gpuDelegate.gpuUsageVal / 100)) : 0
                                     radius: 2
-                                    variant: root.gpuRole
+                                    variant: "primary"
 
                                     Behavior on width {
                                         NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -423,7 +418,6 @@ Item {
                             spacing: 6
 
                             readonly property real diskUsageVal: SystemResources.diskUsage[diskDelegate.modelData] || 0
-                            readonly property string diskRole: Colors.metricRole("disk", diskUsageVal)
 
                             RowLayout {
                                 Layout.fillWidth: true
@@ -433,7 +427,7 @@ Item {
                                     implicitWidth: 26
                                     implicitHeight: 26
                                     radius: 13
-                                    variant: diskDelegate.diskRole
+                                    variant: "primary"
 
                                     Text {
                                         anchors.centerIn: parent
@@ -442,7 +436,7 @@ Item {
                                         text: Icons.disk
                                         font.family: Icons.font
                                         font.pixelSize: 13
-                                        color: Styling.srItem(diskDelegate.diskRole)
+                                        color: Styling.srItem("primary")
                                     }
                                 }
 
@@ -495,7 +489,7 @@ Item {
                                     height: parent.height
                                     width: (diskDelegate.diskUsageVal > 0) ? Math.max(2, diskTrack.width * Math.min(1.0, diskDelegate.diskUsageVal / 100)) : 0
                                     radius: 2
-                                    variant: diskDelegate.diskRole
+                                    variant: "primary"
 
                                     Behavior on width {
                                         NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -521,7 +515,7 @@ Item {
                             implicitWidth: 26
                             implicitHeight: 26
                             radius: 13
-                            variant: root.networkRole
+                            variant: "primary"
 
                             Text {
                                 anchors.centerIn: parent
@@ -530,7 +524,7 @@ Item {
                                 text: NetworkService.vpnConnected ? Icons.vpnKey : (NetworkService.wifiEnabled ? Icons.wifiHigh : Icons.ethernet)
                                 font.family: Icons.font
                                 font.pixelSize: 13
-                                color: Styling.srItem(root.networkRole)
+                                color: Styling.srItem("primary")
                             }
                         }
 
