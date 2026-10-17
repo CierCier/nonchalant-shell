@@ -36,6 +36,9 @@ Item {
     readonly property bool timerInputActive: layoutLoader.item ? layoutLoader.item.timerInputActive : false
     readonly property bool dashboardInputActive: layoutLoader.item ? layoutLoader.item.dashboardInputActive : false
 
+    readonly property bool keyboardInputActive: timerInputActive || dashboardInputActive
+        || (isLeft && (layoutLoader.item?.trayInputActive ?? false))
+
     readonly property Item barHitbox: (layoutLoader.item && layoutLoader.item.barHitbox) ? layoutLoader.item.barHitbox : fallbackHitbox
     readonly property Item dashboardHitbox: (layoutLoader.item && layoutLoader.item.dashboardHitbox) ? layoutLoader.item.dashboardHitbox : fallbackHitbox
     // Island/Pills: the OSD / notification drop under the collapsed bar.

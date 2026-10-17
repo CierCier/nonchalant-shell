@@ -223,6 +223,106 @@ def check_text_rendering(session, source, scale, passed):
     passed.append(f"nested StyledRect glyph pixels match direct text at {scale}x; texture-mask reference differences: {sum(differences)}/4")
 
 
+def check_tray(session, shell, passed):
+    fixture = Path(__file__).with_name("tray_fixture.py")
+    session.start("tray-fixture", [sys.executable, str(fixture)])
+    state = session.shell_state
+
+    def fixture_call(method, *args):
+        output = session.run([sys.executable, str(fixture), method, *(str(arg) for arg in args)])
+        return json.loads(output) if output else None
+
+    def item(name):
+        return next((item for item in state()["trayItems"]
+                     if item["name"] == name and item["visible"]), None)
+
+    def click(target, button="left"):
+        assert target and target["visible"], target
+        x, y, width, height = target["geometry"]
+        assert width > 0 and height > 0, target
+        session.run(["wlrctl", "pointer", "move", "-10000", "-10000"])
+        session.run(["wlrctl", "pointer", "move", str(round(x + width / 2)), str(round(y + height / 2))])
+        session.run(["wlrctl", "pointer", "click", button])
+        time.sleep(0.25)
+
+    def open_tray():
+        click(state()["trayButton"])
+        session.wait("tray flyout opens", lambda: state()["trayOpen"])
+        time.sleep(0.7)
+        session.wait("tray icons render", lambda: item("trayFlyoutItem_test-0"))
+
+    session.wait("real tray registration", lambda: state()["trayCount"] == 2)
+    session.wait("tray trigger appears", lambda: state()["trayButton"] and state()["trayButton"]["visible"])
+    button_geometry = state()["trayButton"]["geometry"]
+    open_tray()
+    icon = item("trayFlyoutItem_test-0")
+    assert icon["geometry"][0] > button_geometry[0] + button_geometry[2], icon
+    assert state()["trayButton"]["geometry"] == button_geometry, "tray opening moved bar controls"
+    session.run(["grim", str(session.root / "tray-grid.png")])
+    click(state()["trayButton"])
+    session.wait("tray reverse toggle", lambda: not state()["trayOpen"])
+    time.sleep(0.6)
+    open_tray()
+    session.run(["wtype", "-k", "Escape"])
+    session.wait("tray Escape dismissal", lambda: not state()["trayOpen"])
+    time.sleep(0.6)
+    open_tray()
+    session.run(["wlrctl", "pointer", "move", "10000", "10000"])
+    session.run(["wlrctl", "pointer", "click", "left"])
+    session.wait("tray outside click dismissal", lambda: not state()["trayOpen"])
+    time.sleep(0.6)
+    open_tray()
+    session.ipc(shell, "nonchalant", "run", "sound")
+    session.wait("sound replaces tray", lambda: state()["controlMenu"] == "sound" and not state()["trayOpen"])
+    session.ipc(shell, "nonchalant", "run", "sound")
+    session.wait("sound closes", lambda: not state()["popupOpen"])
+    time.sleep(0.6)
+    passed.append("vertical tray flyout placement, stable bar, toggle, Escape, outside click and popup replacement")
+
+    open_tray()
+    click(item("trayFlyoutItem_test-0"))
+    session.wait("tray activation reaches app", lambda: {"item": "test-0", "activate": True} in fixture_call("State")["events"])
+    assert not state()["trayOpen"], "activation left tray open"
+    time.sleep(0.6)
+    open_tray()
+    click(item("trayFlyoutItem_test-0"), "right")
+    session.wait("tray app menu inside flyout", lambda: state()["trayOpen"] and state()["trayMenuItem"] == "test-0")
+    session.wait("real DBusMenu entries", lambda: item("trayMenuAction_Open test app"))
+    assert not item("trayMenuAction_Unavailable action")["enabled"]
+    click(item("trayMenuAction_Unavailable action"))
+    assert fixture_call("State")["events"] == [{"item": "test-0", "activate": True}]
+    assert state()["trayOpen"]
+    click(item("trayFlyoutBack"))
+    session.wait("tray menu back navigation", lambda: state()["trayMenuItem"] == "" and item("trayFlyoutItem_test-1"))
+    click(item("trayFlyoutItem_test-1"))
+    session.wait("menu-only tray left click", lambda: state()["trayMenuItem"] == "test-1")
+    session.wait("menu-only entries render", lambda: item("trayMenuAction_More actions"))
+    click(item("trayMenuAction_More actions"))
+    session.wait("tray submenu opens", lambda: item("trayMenuAction_Nested action"))
+    session.run(["grim", str(session.root / "tray-submenu.png")])
+    click(item("trayMenuAction_Nested action"))
+    session.wait("nested menu action reaches app", lambda: {"item": "test-1", "menu": 3} in fixture_call("State")["events"])
+    assert not state()["trayOpen"], "menu action left tray open"
+    time.sleep(0.6)
+    passed.append("real tray activation, right-click menu, disabled action, back navigation, menu-only item and submenu dispatch")
+
+    open_tray()
+    fixture_call("SetCount", 10)
+    session.wait("tray grows live", lambda: state()["trayCount"] == 10 and item("trayFlyoutItem_test-9"))
+    time.sleep(0.7)
+    assert state()["trayButton"]["geometry"] == button_geometry, "tray growth resized bar"
+    session.run(["grim", str(session.root / "tray-many-items.png")])
+    click(item("trayFlyoutItem_test-1"))
+    session.wait("selected menu before removal", lambda: state()["trayMenuItem"] == "test-1")
+    fixture_call("SetCount", 1)
+    session.wait("selected tray app disappears", lambda: state()["trayCount"] == 1 and state()["trayMenuItem"] == "" and item("trayFlyoutItem_test-0"))
+    fixture_call("SetCount", 0)
+    session.wait("empty tray closes and hides trigger", lambda: state()["trayCount"] == 0 and not state()["trayOpen"] and not state()["trayButton"]["visible"])
+    fixture_call("SetCount", 2)
+    session.wait("tray returns", lambda: state()["trayCount"] == 2 and state()["trayButton"]["visible"])
+    passed.append("live tray growth, selected app removal, empty tray dismissal and trigger recovery")
+
+
 def exercise(session, source, args, passed):
     private_source = session.root / "source"
     shutil.copytree(source, private_source, ignore=shutil.ignore_patterns(".git", "__pycache__"))
@@ -276,6 +376,8 @@ def exercise(session, source, args, passed):
         def shell_state():
             return json.loads(session.ipc(shell, "shell-test", "state"))
         session.shell_state = shell_state
+        if args.style == "left":
+            check_tray(session, shell, passed)
         for command, field, island_mode in (("launcher", "launcherOpen", "apps"),
                 ("dashboard", "dashboardOpen", "dashboard"), ("power", "powerOpen", "power")):
             session.ipc(shell, "nonchalant", "run", command)

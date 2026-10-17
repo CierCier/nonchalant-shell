@@ -32,7 +32,7 @@ PanelWindow {
             return WlrKeyboardFocus.Exclusive;
         // Bar popups are child surfaces of this panel. The parent layer must
         // request keyboard focus or input continues to the client underneath.
-        if (barContent.timerInputActive || barContent.dashboardInputActive)
+        if (barContent.keyboardInputActive)
             return WlrKeyboardFocus.Exclusive;
         // Request compositor ownership before focusing the assistant input.
         // Requiring activeFocus here is circular: the field cannot gain focus

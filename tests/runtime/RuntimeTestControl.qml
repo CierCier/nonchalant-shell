@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Services.SystemTray
 import Quickshell.Io
 import qs.modules.services
 import qs.modules.globals
@@ -12,8 +13,9 @@ Item {
         if (!item)
             return [];
         let items = [];
-        if (item.objectName.startsWith("dashboard") || item.objectName.startsWith("verticalWorkspace") || item.objectName.startsWith("workspaceWindows")) {
-            const position = item.mapToItem(null, 0, 0);
+        const trayItem = item.objectName.startsWith("trayFlyout") || item.objectName.startsWith("trayMenuAction") || item.objectName === "verticalTrayButton";
+        if (trayItem || item.objectName.startsWith("dashboard") || item.objectName.startsWith("verticalWorkspace") || item.objectName.startsWith("workspaceWindows")) {
+            const position = trayItem ? item.mapToGlobal(0, 0) : item.mapToItem(null, 0, 0);
             items.push({
                 name: item.objectName,
                 geometry: [position.x, position.y, item.width, item.height],
@@ -61,6 +63,14 @@ Item {
                 launcherOpen: GlobalStates.launcherOpen,
                 dashboardOpen: GlobalStates.dashboardOpen,
                 popupOpen: Visibilities.activeBarPopup?.isOpen ?? false,
+                trayCount: SystemTray.items.values.length,
+                trayOpen: Visibilities.activeBarPopup?.objectName === "verticalTrayFlyout"
+                    && Visibilities.activeBarPopup.isOpen,
+                trayMenuItem: Visibilities.activeBarPopup?.menuItem?.id ?? "",
+                trayItems: Visibilities.activeBarPopup?.objectName === "verticalTrayFlyout"
+                    ? root.dashboardItems(Visibilities.activeBarPopup.contentItem) : [],
+                trayButton: root.dashboardItems(controller?.bar ?? null)
+                    .find(item => item.name === "verticalTrayButton") ?? null,
                 systemMonitorOpen: GlobalStates.systemMonitorOpen,
                 controlMenu: Visibilities.activeBarPopup?.menuMode ?? "",
                 dashboardSection: controller?.dashboardSection ?? "",
