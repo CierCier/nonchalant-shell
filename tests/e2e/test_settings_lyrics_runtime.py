@@ -267,6 +267,7 @@ ShellRoot {
                 try {
                     Config.theme.animDuration = 300
                     tryVerify(() => aligned(notifications))
+                    tryCompare(highlight, "morphing", true)
                     const fromY = highlight.y
                     controls.dashboardSection = "stats"
                     const targetY = stats.mapToItem(highlight.parent, 0, 0).y
@@ -414,6 +415,8 @@ class SettingsLyricsRuntimeTests(unittest.TestCase):
             self.assertIn("SETTINGS_COLOR_HUES_PASSED", output, output)
             self.assertIn("SETTINGS_BAR_POSITION_RUNTIME_PASSED", output, output)
             self.assertIn("VERTICAL_MEDIA_LYRICS_LIFETIME_PASSED", output, output)
+            self.assertIn("VERTICAL_DASHBOARD_CONTROL_ISLANDS_PASSED", output, output)
+            self.assertIn("VERTICAL_DASHBOARD_SPLIT_LYRICS_PASSED", output, output)
             self.assertNotIn("SETTINGS_LYRICS_RUNTIME_TIMEOUT", output, output)
             self.assertNotIn("FAIL!", output, output)
 

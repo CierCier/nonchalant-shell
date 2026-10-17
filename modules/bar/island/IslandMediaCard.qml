@@ -304,7 +304,7 @@ StyledRect {
         }
 
         LyricsView {
-            visible: root.showLyrics && (!collapseWhenEmpty || hasLyrics)
+            visible: root.showLyrics && (!collapseWhenEmpty || (hasTrack && lyricsEnabled && LyricsService.available))
             collapseWhenEmpty: true
             Layout.fillWidth: true
             Layout.preferredHeight: 22

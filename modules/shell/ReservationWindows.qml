@@ -96,12 +96,13 @@ Item {
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         WlrLayershell.namespace: "nonchalant:reservation:left"
 
-        // The dock and a pinned left sidebar share the left edge, so the zone
-        // is the wider of the two instead of two stacked reservations.
+        // The left sidebar begins beside the dock, so reserve their combined
+        // footprint in one exclusive zone.
         exclusiveZone: Math.max(
             root.barReserves && root.barStyle === "left" ? root.barZone : 0,
             root.sidebarEnabled && root.sidebarPinned && root.sidebarPosition === "left"
                 ? root.sidebarWidth + root.sidebarMargin
+                    + (root.barReserves && root.barStyle === "left" ? root.barZone : 0)
                 : 0)
         exclusionMode: exclusiveZone > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
 

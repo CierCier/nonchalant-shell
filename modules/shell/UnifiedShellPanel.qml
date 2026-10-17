@@ -198,10 +198,12 @@ PanelWindow {
                     targetScreen: unifiedPanel.targetScreen
 
                     anchors.topMargin: unifiedPanel.barEnabled
+                        && unifiedPanel.barStyle !== "left"
                         && unifiedPanel.barPosition === "top"
                         ? unifiedPanel.barTargetHeight + unifiedPanel.barOuterMargin
                         : 0
                     anchors.bottomMargin: unifiedPanel.barEnabled
+                        && unifiedPanel.barStyle !== "left"
                         && unifiedPanel.barPosition === "bottom"
                         ? unifiedPanel.barTargetHeight + unifiedPanel.barOuterMargin
                         : 0

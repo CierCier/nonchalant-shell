@@ -211,6 +211,11 @@ def check_text_rendering(session, source, scale, passed):
         assert image.getpixel((round((x + 130) * scale), round(435 * scale))) != background, "Gradient did not render"
     assert image.getpixel((round(21 * scale), round(481 * scale))) != background, "Square hover corner is missing"
     assert image.getpixel((round(279 * scale), round(481 * scale))) == background, "Hover escaped rounded corner"
+    reference_border = image.getpixel((round(450 * scale), round(481 * scale)))
+    for column in range(3):
+        border = image.getpixel((round((150 + column * 300) * scale), round(381 * scale)))
+        assert max(abs(a - b) for a, b in zip(border, reference_border)) <= 1, f"Procedural border alpha differs from the single solid border: {border} vs {reference_border}"
+    passed.append("translucent procedural borders match a single-painted solid border")
     passed.append("linear, radial, halftone backgrounds and asymmetric hover corners render with preserved rounding")
     probe.terminate()
     probe.wait(timeout=5)
@@ -234,7 +239,7 @@ def exercise(session, source, args, passed):
             session.ipc(native_probe, "hyprland-native", "state"))
         (session.root / "quickshell-native-state.json").write_text(native_state)
     colors = Path(session.env["HOME"]) / ".cache/nonchalant"
-    colors.mkdir(parents=True)
+    colors.mkdir(parents=True, exist_ok=True)
     shutil.copy2(private_source / "assets/colors/Catppuccin/dark.json", colors / "colors.json")
     shell_source = private_source / "shell.qml"
     shell_text = shell_source.read_text()
@@ -246,7 +251,7 @@ def exercise(session, source, args, passed):
             'readonly property string ipcPipe: "/tmp/nonchalant_ipc.pipe"',
             'readonly property string ipcPipe: Quickshell.env("XDG_RUNTIME_DIR") + "/nonchalant_ipc.pipe"'))
     config = Path(session.env["XDG_CONFIG_HOME"]) / "nonchalant/config"
-    config.mkdir(parents=True)
+    config.mkdir(parents=True, exist_ok=True)
     (config / "bar.json").write_text(json.dumps({"style": args.style}))
     (config / "ai.json").write_text(json.dumps({"enabled": False}))
     if args.baseline:
@@ -387,6 +392,39 @@ def exercise(session, source, args, passed):
     if shell:
         time.sleep(0.7)
         session.run(["grim", str(session.root / "occupied-shell.png")])
+    if shell and args.style == "left" and args.compositor == "niri":
+        original_position = session.shell_state()["barPosition"]
+        session.ipc(probe, "compositor-test", "focusWindow", first["id"])
+        session.wait("focused client before sidebar check", lambda: state()["focusedWindow"] == first["id"])
+        session.run(["niri", "msg", "action", "maximize-column"])
+        try:
+            for position in ("top", "bottom"):
+                session.ipc(shell, "shell-test", "assistant", "left", "true", "true", position, "true")
+                session.wait("assistant sidebar is active", lambda: session.shell_state()["assistant"] is not None
+                    and session.shell_state()["assistant"]["active"])
+                sidebar = session.shell_state()["assistant"]
+                assert sidebar["geometry"][1] == 0, "Left dock must not leave a horizontal bar gap"
+                assert sidebar["geometry"][3] == session.shell_state()["panelSize"][1]
+                session.wait("pinned sidebar reserves its full offset", lambda:
+                    next(w for w in state()["windows"] if w["id"] == first["id"])["geometry"][2]
+                    <= session.shell_state()["panelSize"][0] - session.shell_state()["assistant"]["geometry"][0] - sidebar["hitbox"][2])
+            pinned_width = next(w for w in state()["windows"] if w["id"] == first["id"])["geometry"][2]
+            session.run(["grim", str(session.root / "pinned-assistant.png")])
+            session.ipc(shell, "shell-test", "assistant", "left", "false", "true", "top", "true")
+            session.wait("unpinned sidebar releases its reservation", lambda:
+                next(w for w in state()["windows"] if w["id"] == first["id"])["geometry"][2] > pinned_width)
+            session.ipc(shell, "shell-test", "assistant", "right", "true", "true", "top", "true")
+            session.wait("right sidebar reserves the opposite edge", lambda:
+                next(w for w in state()["windows"] if w["id"] == first["id"])["geometry"][2]
+                <= session.shell_state()["panelSize"][0] - 464)
+            session.ipc(shell, "shell-test", "assistant", "left", "true", "true", "top", "false")
+            session.wait("disabled bar removes the sidebar offset", lambda:
+                session.shell_state()["assistant"]["geometry"][0] == 0
+                and next(w for w in state()["windows"] if w["id"] == first["id"])["geometry"][2] > pinned_width)
+        finally:
+            session.ipc(shell, "shell-test", "assistant", "right", "false", "false", original_position, "true")
+            session.run(["niri", "msg", "action", "maximize-column"])
+        passed.append("pinned assistant reserves the dock offset, spans full height, and releases space when unpinned or the bar is disabled")
     session.ipc(probe, "compositor-test", "focusWindow", second["id"])
     session.wait("second client focus", lambda: state()["focusedWindow"] == second["id"])
     session.ipc(probe, "compositor-test", "focusWindow", first["id"])

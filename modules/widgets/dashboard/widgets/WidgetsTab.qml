@@ -33,7 +33,7 @@ Item {
         FullPlayer {
             visible: !root.verticalBar
             Layout.preferredWidth: 216
-            lyricsActive: root.lyricsActive
+            lyricsActive: !root.verticalBar && root.lyricsActive
             Layout.fillHeight: true
         }
 

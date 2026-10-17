@@ -45,6 +45,8 @@ Singleton {
                 const controller = Visibilities.getDashboardControllerForActive();
                 if (controller)
                     controller.openControlMenu(mode);
+                else
+                    console.warn("GlobalShortcuts: no dashboard controller registered for the focused monitor");
                 return;
             }
         }

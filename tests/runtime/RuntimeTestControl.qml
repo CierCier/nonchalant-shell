@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import qs.modules.services
 import qs.modules.globals
+import qs.config
 
 Item {
     id: root
@@ -30,10 +31,26 @@ Item {
 
     IpcHandler {
         target: "shell-test"
+        function assistant(position: string, pinned: bool, visible: bool, barPosition: string, barEnabled: bool): void {
+            Config.ai.enabled = visible;
+            Config.ai.sidebarEnabled = true;
+            Config.bar.position = barPosition;
+            Config.bar.screenList = barEnabled ? [] : ["not-a-test-output"];
+            GlobalStates.assistantPosition = position;
+            GlobalStates.assistantPinned = pinned;
+            GlobalStates.assistantWidth = 400;
+            GlobalStates.assistantScreenName = Quickshell.screens[0]?.name ?? "";
+            GlobalStates.assistantVisible = visible;
+        }
+
         function state(): string {
             const island = Visibilities.getIslandForActive();
             const outputName = Quickshell.screens[0]?.name ?? "";
             const controller = Visibilities.getDashboardControllerForActive();
+            const panel = Visibilities.getBarPanelForScreen(outputName);
+            const sidebar = panel?.assistantSidebar;
+            const hitbox = sidebar?.hitbox;
+            const hitboxPosition = hitbox?.mapToItem(null, 0, 0);
             return JSON.stringify({
                 activeModule: Visibilities.currentActiveModule,
                 activeScreen: Visibilities.getForActive()?.screenName ?? "",
@@ -54,6 +71,13 @@ Item {
                 powerOpen: Visibilities.powerMenuButtons[outputName]?.popupOpen ?? false,
                 hasActiveGrab: FocusGrabManager.hasActiveGrab,
                 settingsVisible: GlobalStates.settingsWindowVisible,
+                panelSize: [panel?.width ?? 0, panel?.height ?? 0],
+                barPosition: panel?.barPosition ?? "",
+                assistant: sidebar ? {
+                    geometry: [sidebar.x, sidebar.y, sidebar.width, sidebar.height],
+                    hitbox: [hitboxPosition?.x ?? 0, hitboxPosition?.y ?? 0, hitbox?.width ?? 0, hitbox?.height ?? 0],
+                    active: sidebar.active
+                } : null,
                 island: island ? {
                     mode: island.currentMode,
                     expanded: island.isExpanded,

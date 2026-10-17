@@ -117,7 +117,8 @@ ShellRoot {
                 height: 70
                 radius: 20
                 variant: modelData
-                enableBorder: false
+                border.width: 4
+                border.color: Qt.rgba(1, 1, 1, 0.5)
 
                 Sample { text: ["Linear", "Radial", "Halftone"][gradientCard.index] }
             }
@@ -139,6 +140,18 @@ ShellRoot {
 
             HoverTint { hovered: true; hoverOpacity: 1 }
             Sample { text: "Asymmetric hover" }
+        }
+
+        StyledRect {
+            x: 320
+            y: 480
+            width: 260
+            height: 65
+            variant: "pane"
+            color: "transparent"
+            radius: 20
+            border.width: 4
+            border.color: Qt.rgba(1, 1, 1, 0.5)
         }
 
         IpcHandler {

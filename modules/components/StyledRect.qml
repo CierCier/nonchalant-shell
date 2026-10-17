@@ -121,14 +121,15 @@ Rectangle {
 
         sourceComponent: ClippingRectangle {
             color: "transparent"
-            contentUnderBorder: true
+            contentUnderBorder: false
             radius: root.radius
             topLeftRadius: root.topLeftRadius
             topRightRadius: root.topRightRadius
             bottomLeftRadius: root.bottomLeftRadius
             bottomRightRadius: root.bottomRightRadius
+            // Leave the stroke to the native rectangle; mask only its inset fill.
             border.width: root.border.width
-            border.color: root.border.color
+            border.color: "transparent"
 
             // Linear gradient - procedural (no texture)
             Loader {

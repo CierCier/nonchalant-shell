@@ -43,6 +43,7 @@ Item {
     readonly property string workspaceOrder: JSON.stringify(visibleWorkspaces.map(workspace => workspace.id))
     property list<string> workspaceIds: []
     onWorkspaceOrderChanged: workspaceIds = visibleWorkspaces.map(workspace => workspace.id)
+    Component.onCompleted: workspaceIds = visibleWorkspaces.map(workspace => workspace.id)
 
     readonly property int activeWorkspaceIndex: visibleWorkspaces.findIndex(workspace => workspace.active)
     readonly property Item activeWorkspaceButton: {
