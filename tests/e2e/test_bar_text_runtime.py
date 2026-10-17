@@ -75,14 +75,16 @@ ShellRoot {
             function test_workspace_initialization() {
                 compositorState.workspaces = [testWorkspace]
                 compositorState.windows = [testWindow]
-                for (const component of [left, taskbar, left, taskbar]) {
+                const components = [left, taskbar, left, taskbar]
+                for (let index = 0; index < components.length; index++) {
+                    const component = components[index]
                     bar.sourceComponent = component
                     tryVerify(() => bar.item !== null)
                     compare(bar.item.workspaceIds.join(","), "1",
                         "A newly created switcher must populate an already loaded workspace list")
                     tryVerify(() => bar.item.activeWorkspaceButton !== null)
                     const button = bar.item.activeWorkspaceButton
-                    testWorkspace.name = "Renamed"
+                    testWorkspace.name = "Renamed " + index
                     compare(bar.item.activeWorkspaceButton, button,
                         "A metadata update must not recreate workspace delegates")
                     bar.sourceComponent = undefined
